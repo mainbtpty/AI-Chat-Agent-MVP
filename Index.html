@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Chat Agent MVP</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto; }
+    #chat { border: 1px solid #ccc; padding: 10px; height: 400px; overflow-y: auto; }
+    .message { margin: 10px 0; }
+    .user { text-align: right; color: blue; }
+    .agent { text-align: left; color: green; }
+    #inputArea { margin-top: 10px; }
+  </style>
+</head>
+<body>
+
+<h2>AI Chat Agent MVP</h2>
+
+<div id="chat"></div>
+
+<div id="inputArea">
+  <input type="text" id="userInput" placeholder="Type your message..." style="width: 70%;" />
+  <button id="sendBtn">Send</button>
+  <button id="voiceBtn">🎤</button>
+</div>
+
+<script>
+  const chat = document.getElementById('chat');
+  const userInput = document.getElementById('userInput');
+  const sendBtn = document.getElementById('sendBtn');
+  const voiceBtn = document.getElementById('voiceBtn');
+
+  // Function to add message to chat window
+  function addMessage(text, sender) {
+    const msgDiv = document.createElement('div');
+    msgDiv.className = 'message ' + sender;
+    msgDiv.textContent = text;
+    chat.appendChild(msgDiv);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  // Simple function to speak text
+  function speak(text) {
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      window.speechSynthesis.speak(utterance);
+    }
+  }
+
+  // Voice recognition setup
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let recognition;
+  if (SpeechRecognition) {
+    recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      userInput.value = transcript;
+      sendMessage();
+    };
+  } else {
+    voiceBtn.disabled = true;
+    voiceBtn.textContent = 'Voice Not Supported';
+  }
+
+  // Send message function
+  async function sendMessage() {
+    const input = userInput.value.trim();
+    if (!input) return;
+
+    addMessage(input, 'user');
+    userInput.value = '';
+
+    // Simple fallback AI reply (replace with Gemini API call)
+    const reply = await getAIResponse(input);
+    addMessage(reply, 'agent');
+    speak(reply);
+  }
+
+  // Dummy AI response function (replace or connect to Gemini API)
+  async function getAIResponse(userText) {
+    // Example: Echo input with a delay to simulate thinking
+    return new Promise(resolve => {
+      setTimeout(() => {
+        // TODO: Replace with real Gemini API call
+        resolve('You said: ' + userText);
+      }, 1000);
+    });
+  }
+
+  sendBtn.addEventListener('click', sendMessage);
+  userInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') sendMessage();
+  });
+  voiceBtn.addEventListener('click', () => {
+    if (recognition) recognition.start();
+  });
+
+</script>
+
+</body>
+</html>
