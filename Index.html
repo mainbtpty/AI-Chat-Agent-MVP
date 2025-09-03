@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>AI Chat Agent MVP</title>
+  <title>AI Chat Agent MVP with Gemini API</title>
   <style>
     body { font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto; }
     #chat { border: 1px solid #ccc; padding: 10px; height: 400px; overflow-y: auto; }
@@ -31,7 +31,33 @@
   const sendBtn = document.getElementById('sendBtn');
   const voiceBtn = document.getElementById('voiceBtn');
 
-  // Function to add message to chat window
+  // Your dataset for keyword matching
+  const dataset = [
+    {
+      keywords: ['about', 'company', 'maestros', 'software development'],
+      answer: `MAESTROS OF SOFTWARE DEVELOPMENT
+Where code meets artistry: crafting bespoke software solutions
+
+Developing the right software solutions for your business and integrating complex systems is both an art and a science – a symphony, if you like – and it’s what we do best.
+
+Our expertise includes developing the right software solutions for your business and integrating complex systems.`
+    },
+    {
+      keywords: ['cases', 'devsecops', 'project'],
+      answer: `Cases - Project cases
+
+The Power of DevSecOps: Achieving Speed and Security in Software Development
+Explore how DevSecOps revolutionizes software development by prioritizing both speed and security.`
+    },
+    {
+      keywords: ['about us', 'team', 'developers'],
+      answer: `ABOUT US
+We are continuously sourcing exceptional developers who posses a unique blend of creativity, innovation, and strategic thinking, as they bring a touch of artistry to their coding.`
+    }
+    // Add more entries as needed
+  ];
+
+  // Add message to chat window
   function addMessage(text, sender) {
     const msgDiv = document.createElement('div');
     msgDiv.className = 'message ' + sender;
@@ -40,7 +66,7 @@
     chat.scrollTop = chat.scrollHeight;
   }
 
-  // Simple function to speak text
+  // Speak text aloud
   function speak(text) {
     if ('speechSynthesis' in window) {
       const utterance = new SpeechSynthesisUtterance(text);
@@ -67,7 +93,62 @@
     voiceBtn.textContent = 'Voice Not Supported';
   }
 
-  // Send message function
+  // Check dataset for keyword matches
+  function checkDataset(input) {
+    const lowerInput = input.toLowerCase();
+    for (const entry of dataset) {
+      if (entry.keywords.some(keyword => lowerInput.includes(keyword))) {
+        return entry.answer;
+      }
+    }
+    return null;
+  }
+
+  // Call Gemini API
+  async function callGeminiAPI(userText) {
+    const apiKey = 'AIzaSyD1rrdR9nJs3TJCFYNlp1FfFWwhcJxoImo'; // Your Gemini API key
+    const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+
+    const body = {
+      contents: [
+        {
+          parts: [
+            { text: userText }
+          ]
+        }
+      ]
+    };
+
+    try {
+      const response = await fetch(url + '?key=' + apiKey, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // Note: API key is passed as query param, no Authorization header needed
+        },
+        body: JSON.stringify(body)
+      });
+
+      if (!response.ok) {
+        console.error('Gemini API error:', response.status, response.statusText);
+        return 'Sorry, I am having trouble connecting to the AI service.';
+      }
+
+      const data = await response.json();
+
+      // Extract generated text from response
+      // Adjust this if Gemini API response format changes
+      const generatedText = data?.candidates?.[0]?.content || 'Sorry, I did not understand that.';
+
+      return generatedText;
+
+    } catch (error) {
+      console.error('Fetch error:', error);
+      return 'Error connecting to AI service.';
+    }
+  }
+
+  // Send message handler
   async function sendMessage() {
     const input = userInput.value.trim();
     if (!input) return;
@@ -75,21 +156,18 @@
     addMessage(input, 'user');
     userInput.value = '';
 
-    // Simple fallback AI reply (replace with Gemini API call)
-    const reply = await getAIResponse(input);
-    addMessage(reply, 'agent');
-    speak(reply);
-  }
+    // Check dataset first
+    const datasetReply = checkDataset(input);
+    if (datasetReply) {
+      addMessage(datasetReply, 'agent');
+      speak(datasetReply);
+      return;
+    }
 
-  // Dummy AI response function (replace or connect to Gemini API)
-  async function getAIResponse(userText) {
-    // Example: Echo input with a delay to simulate thinking
-    return new Promise(resolve => {
-      setTimeout(() => {
-        // TODO: Replace with real Gemini API call
-        resolve('You said: ' + userText);
-      }, 1000);
-    });
+    // Otherwise call Gemini API
+    const aiReply = await callGeminiAPI(input);
+    addMessage(aiReply, 'agent');
+    speak(aiReply);
   }
 
   sendBtn.addEventListener('click', sendMessage);
