@@ -7,10 +7,13 @@
   <style>
     body { font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto; }
     #chat { border: 1px solid #ccc; padding: 10px; height: 400px; overflow-y: auto; }
-    .message { margin: 10px 0; }
-    .user { text-align: right; color: blue; }
-    .agent { text-align: left; color: green; }
-    #inputArea { margin-top: 10px; }
+    .message { margin: 10px 0; padding: 8px; border-radius: 5px; }
+    .user { text-align: right; color: blue; background: #e6f3ff; }
+    .agent { text-align: left; color: green; background: #e6ffe6; }
+    #inputArea { margin-top: 10px; display: flex; gap: 10px; }
+    #userInput { width: 70%; padding: 5px; }
+    #sendBtn, #voiceBtn { padding: 5px 10px; cursor: pointer; }
+    #voiceBtn.listening { background: #ffcccc; }
   </style>
 </head>
 <body>
@@ -20,7 +23,7 @@
 <div id="chat"></div>
 
 <div id="inputArea">
-  <input type="text" id="userInput" placeholder="Type your message..." style="width: 70%;" />
+  <input type="text" id="userInput" placeholder="Type your message..." />
   <button id="sendBtn">Send</button>
   <button id="voiceBtn">🎤</button>
 </div>
@@ -31,7 +34,7 @@
   const sendBtn = document.getElementById('sendBtn');
   const voiceBtn = document.getElementById('voiceBtn');
 
-  // Your dataset for keyword matching
+  // Dataset for keyword-based responses
   const dataset = [
     {
       keywords: ['about', 'company', 'maestros', 'software development'],
@@ -53,14 +56,18 @@ Explore how DevSecOps revolutionizes software development by prioritizing both s
       keywords: ['about us', 'team', 'developers'],
       answer: `ABOUT US
 We are continuously sourcing exceptional developers who posses a unique blend of creativity, innovation, and strategic thinking, as they bring a touch of artistry to their coding.`
+    },
+    {
+      keywords: ['ai skills', 'machine learning', 'expertise'],
+      answer: `AI SKILLS SHOWCASE
+This chatbot demonstrates my ability to integrate the Gemini AI API with web technologies, combining natural language processing with voice input/output for a seamless user experience.`
     }
-    // Add more entries as needed
   ];
 
   // Add message to chat window
   function addMessage(text, sender) {
     const msgDiv = document.createElement('div');
-    msgDiv.className = 'message ' + sender;
+    msgDiv.className = `message ${sender}`;
     msgDiv.textContent = text;
     chat.appendChild(msgDiv);
     chat.scrollTop = chat.scrollHeight;
@@ -71,6 +78,8 @@ We are continuously sourcing exceptional developers who posses a unique blend of
     if ('speechSynthesis' in window) {
       const utterance = new SpeechSynthesisUtterance(text);
       window.speechSynthesis.speak(utterance);
+    } else {
+      addMessage('Text-to-speech not supported in this browser.', 'agent');
     }
   }
 
@@ -86,7 +95,24 @@ We are continuously sourcing exceptional developers who posses a unique blend of
     recognition.onresult = (event) => {
       const transcript = event.results[0][0].transcript;
       userInput.value = transcript;
+      voiceBtn.classList.remove('listening');
       sendMessage();
+    };
+
+    recognition.onstart = () => {
+      voiceBtn.classList.add('listening');
+      voiceBtn.textContent = '🎤 Listening...';
+    };
+
+    recognition.onend = () => {
+      voiceBtn.classList.remove('listening');
+      voiceBtn.textContent = '🎤';
+    };
+
+    recognition.onerror = (event) => {
+      voiceBtn.classList.remove('listening');
+      voiceBtn.textContent = '🎤';
+      addMessage('Voice recognition error: ' + event.error, 'agent');
     };
   } else {
     voiceBtn.disabled = true;
@@ -106,8 +132,8 @@ We are continuously sourcing exceptional developers who posses a unique blend of
 
   // Call Gemini API
   async function callGeminiAPI(userText) {
-    const apiKey = 'AIzaSyD1rrdR9nJs3TJCFYNlp1FfFWwhcJxoImo'; // Your Gemini API key
-    const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+    const apiKey = 'YOUR_GEMINI_API_KEY'; // Replace with your key or move to backend
+    const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
 
     const body = {
       contents: [
@@ -123,8 +149,7 @@ We are continuously sourcing exceptional developers who posses a unique blend of
       const response = await fetch(url + '?key=' + apiKey, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          // Note: API key is passed as query param, no Authorization header needed
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(body)
       });
@@ -135,11 +160,7 @@ We are continuously sourcing exceptional developers who posses a unique blend of
       }
 
       const data = await response.json();
-
-      // Extract generated text from response
-      // Adjust this if Gemini API response format changes
-      const generatedText = data?.candidates?.[0]?.content || 'Sorry, I did not understand that.';
-
+      const generatedText = data?.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, I did not understand that.';
       return generatedText;
 
     } catch (error) {
@@ -151,7 +172,10 @@ We are continuously sourcing exceptional developers who posses a unique blend of
   // Send message handler
   async function sendMessage() {
     const input = userInput.value.trim();
-    if (!input) return;
+    if (!input) {
+      addMessage('Please enter a message.', 'agent');
+      return;
+    }
 
     addMessage(input, 'user');
     userInput.value = '';
@@ -164,12 +188,15 @@ We are continuously sourcing exceptional developers who posses a unique blend of
       return;
     }
 
-    // Otherwise call Gemini API
+    // Show loading message
+    addMessage('Thinking...', 'agent');
     const aiReply = await callGeminiAPI(input);
+    chat.lastChild.remove(); // Remove "Thinking..." message
     addMessage(aiReply, 'agent');
     speak(aiReply);
   }
 
+  // Event listeners
   sendBtn.addEventListener('click', sendMessage);
   userInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') sendMessage();
