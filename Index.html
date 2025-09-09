@@ -10,10 +10,13 @@
     .message { margin: 10px 0; padding: 8px; border-radius: 5px; }
     .user { text-align: right; color: blue; background: #e6f3ff; }
     .agent { text-align: left; color: green; background: #e6ffe6; }
+    .error { text-align: left; color: red; background: #ffe6e6; }
     #inputArea { margin-top: 10px; display: flex; gap: 10px; }
     #userInput { width: 70%; padding: 5px; }
     #sendBtn, #voiceBtn { padding: 5px 10px; cursor: pointer; }
     #voiceBtn.listening { background: #ffcccc; }
+    .loading::after { content: '⏳'; animation: spin 1s infinite; }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
@@ -37,11 +40,9 @@
   // Dataset for keyword-based responses
   const dataset = [
     {
-      keywords: ['about', 'company', 'Lalandi', 'software development'],
-      answer: `Lalandi Conclusion is a Cape Town based software development company established in 2006.
-
-  As a proud member of the Dutch Conclusion group, Lalandi Conclusion have earned the trust of clients in Africa and Europe as their preferred technology partner.
-
+      keywords: ['about', 'company', 'maestros', 'software development'],
+      answer: `MAESTROS OF SOFTWARE DEVELOPMENT
+Where code meets artistry: crafting bespoke software solutions
 
 Developing the right software solutions for your business and integrating complex systems is both an art and a science – a symphony, if you like – and it’s what we do best.
 
@@ -51,7 +52,8 @@ Our expertise includes developing the right software solutions for your business
       keywords: ['cases', 'devsecops', 'project'],
       answer: `Cases - Project cases
 
-Their DevSecOps service offers leadership, team training, continuous process improvement support, and a repository for shared best practices, blueprints, and code. Since Lalandi I&O resources are not dedicated full-time to a software delivery team, this model works most efficiently with their standardized set of tools used across all automated delivery pipelines. `
+The Power of DevSecOps: Achieving Speed and Security in Software Development
+Explore how DevSecOps revolutionizes software development by prioritizing both speed and security.`
     },
     {
       keywords: ['about us', 'team', 'developers'],
@@ -61,7 +63,12 @@ We are continuously sourcing exceptional developers who posses a unique blend of
     {
       keywords: ['ai skills', 'machine learning', 'expertise'],
       answer: `AI SKILLS SHOWCASE
-This chatbot demonstrates my ability to integrate the Gemini AI API with web technologies, combining natural language processing with voice input/output for a seamless user experience.`
+This chatbot demonstrates my ability to integrate the Gemini AI API with web technologies, combining natural language processing with voice input/output. I have experience with AI APIs, web development, and building user-friendly interfaces.`
+    },
+    {
+      keywords: ['portfolio', 'projects', 'work'],
+      answer: `MY PORTFOLIO
+I've built projects like this AI-powered chatbot, a web scraper for extracting website content, and other applications integrating APIs and modern JavaScript. Ask me about specific projects to learn more!`
     }
   ];
 
@@ -80,7 +87,7 @@ This chatbot demonstrates my ability to integrate the Gemini AI API with web tec
       const utterance = new SpeechSynthesisUtterance(text);
       window.speechSynthesis.speak(utterance);
     } else {
-      addMessage('Text-to-speech not supported in this browser.', 'agent');
+      addMessage('Text-to-speech not supported in this browser.', 'error');
     }
   }
 
@@ -113,7 +120,7 @@ This chatbot demonstrates my ability to integrate the Gemini AI API with web tec
     recognition.onerror = (event) => {
       voiceBtn.classList.remove('listening');
       voiceBtn.textContent = '🎤';
-      addMessage('Voice recognition error: ' + event.error, 'agent');
+      addMessage('Voice recognition error: ' + event.error, 'error');
     };
   } else {
     voiceBtn.disabled = true;
@@ -122,51 +129,64 @@ This chatbot demonstrates my ability to integrate the Gemini AI API with web tec
 
   // Check dataset for keyword matches
   function checkDataset(input) {
-    const lowerInput = input.toLowerCase();
+    const lowerInput = input.toLowerCase().trim();
+    console.log('Checking dataset for:', lowerInput);
     for (const entry of dataset) {
-      if (entry.keywords.some(keyword => lowerInput.includes(keyword))) {
+      const matched = entry.keywords.some(keyword => {
+        const match = lowerInput.includes(keyword.toLowerCase());
+        console.log(`Keyword: ${keyword}, Match: ${match}`);
+        return match;
+      });
+      if (matched) {
+        console.log('Dataset match found:', entry.answer);
         return entry.answer;
       }
     }
+    console.log('No dataset match, falling back to API');
     return null;
   }
 
-  // Call Gemini API
+  // Call Gemini API with rate limit delay
+  let lastApiCall = 0;
   async function callGeminiAPI(userText) {
-    const apiKey = 'AIzaSyD1rrdR9nJs3TJCFYNlp1FfFWwhcJxoImo'; // Replace with your key or move to backend
+    const apiKey = 'AIzaSyD1rrdR9nJs3TJCFYNlp1FfFWwhcJxoImo'; // Replace with your actual Gemini API key
     const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+    const minDelay = 4000; // 4 seconds to avoid rate limits (15 RPM = 4s per request)
+
+    // Enforce minimum delay to prevent 429 errors
+    const now = Date.now();
+    const timeSinceLast = now - lastApiCall;
+    if (timeSinceLast < minDelay) {
+      await new Promise(resolve => setTimeout(resolve, minDelay - timeSinceLast));
+    }
 
     const body = {
-      contents: [
-        {
-          parts: [
-            { text: userText }
-          ]
-        }
-      ]
+      contents: [{ parts: [{ text: userText }] }]
     };
 
     try {
       const response = await fetch(url + '?key=' + apiKey, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
 
+      lastApiCall = Date.now();
+
       if (!response.ok) {
-        console.error('Gemini API error:', response.status, response.statusText);
-        return 'Sorry, I am having trouble connecting to the AI service.';
+        const errorText = await response.text();
+        console.error('Gemini API error:', response.status, response.statusText, errorText);
+        return `Sorry, I am having trouble connecting to the AI service: ${response.status} ${response.statusText}`;
       }
 
       const data = await response.json();
       const generatedText = data?.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, I did not understand that.';
+      console.log('API response:', data);
       return generatedText;
 
     } catch (error) {
       console.error('Fetch error:', error);
-      return 'Error connecting to AI service.';
+      return 'Error connecting to AI service: ' + error.message;
     }
   }
 
@@ -174,7 +194,7 @@ This chatbot demonstrates my ability to integrate the Gemini AI API with web tec
   async function sendMessage() {
     const input = userInput.value.trim();
     if (!input) {
-      addMessage('Please enter a message.', 'agent');
+      addMessage('Please enter a message.', 'error');
       return;
     }
 
@@ -205,6 +225,9 @@ This chatbot demonstrates my ability to integrate the Gemini AI API with web tec
   voiceBtn.addEventListener('click', () => {
     if (recognition) recognition.start();
   });
+
+  // Welcome message
+  addMessage('Welcome to my AI Chat Agent! Ask about my company, AI skills, or anything else. Try voice input with the 🎤 button.', 'agent');
 
 </script>
 
