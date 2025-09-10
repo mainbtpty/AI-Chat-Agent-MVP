@@ -3,19 +3,80 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>AI Chat Agent MVP with Gemini API</title>
+  <title>AI Chat Agent MVP by Oni Charles</title>
   <style>
-    body { font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto; }
-    #chat { border: 1px solid #ccc; padding: 10px; height: 400px; overflow-y: auto; }
-    .message { margin: 10px 0; padding: 8px; border-radius: 5px; }
-    .user { text-align: right; color: blue; background: #e6f3ff; }
-    .agent { text-align: left; color: green; background: #e6ffe6; }
-    .error { text-align: left; color: red; background: #ffe6e6; }
-    #inputArea { margin-top: 10px; display: flex; gap: 10px; }
-    #userInput { width: 70%; padding: 5px; }
-    #sendBtn, #voiceBtn { padding: 5px 10px; cursor: pointer; }
-    #voiceBtn.listening { background: #ffcccc; }
-    .loading::after { content: '⏳'; animation: spin 1s infinite; }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+      max-width: 600px; 
+      margin: 20px auto; 
+      background: #f5f5f5;
+    }
+    h2 { color: #2c3e50; }
+    #chat { 
+      border: 1px solid #ddd; 
+      padding: 15px; 
+      height: 400px; 
+      overflow-y: auto; 
+      background: #fff; 
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .message { 
+      margin: 10px 0; 
+      padding: 10px; 
+      border-radius: 8px; 
+      animation: fadeIn 0.3s ease-in;
+    }
+    .user { 
+      text-align: right; 
+      color: #2c3e50; 
+      background: #e3f2fd; 
+    }
+    .agent { 
+      text-align: left; 
+      color: #1a5c37; 
+      background: #e8f5e9; 
+    }
+    .error { 
+      text-align: left; 
+      color: #d32f2f; 
+      background: #ffebee; 
+    }
+    #inputArea { 
+      margin-top: 15px; 
+      display: flex; 
+      gap: 10px; 
+      align-items: center;
+    }
+    #userInput { 
+      width: 70%; 
+      padding: 8px; 
+      border: 1px solid #ddd; 
+      border-radius: 4px; 
+      font-size: 16px;
+    }
+    #sendBtn, #voiceBtn, #stopSpeechBtn { 
+      padding: 8px 12px; 
+      border: none; 
+      border-radius: 4px; 
+      cursor: pointer; 
+      background: #1976d2; 
+      color: #fff; 
+      font-size: 14px;
+    }
+    #voiceBtn.listening { background: #d81b60; }
+    #stopSpeechBtn { background: #d32f2f; }
+    .loading::after { 
+      content: '⏳'; 
+      animation: spin 1s infinite; 
+      margin-left: 5px;
+    }
+    .truncated::after { 
+      content: '... [Show more]'; 
+      color: #1976d2; 
+      cursor: pointer;
+    }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     @keyframes spin { 100% { transform: rotate(360deg); } }
   </style>
 </head>
@@ -29,6 +90,7 @@
   <input type="text" id="userInput" placeholder="Ask about Lalandi, DevSecOps, SAP, or my portfolio..." />
   <button id="sendBtn">Send</button>
   <button id="voiceBtn">🎤</button>
+  <button id="stopSpeechBtn">Stop Speech</button>
 </div>
 
 <script>
@@ -36,93 +98,175 @@
   const userInput = document.getElementById('userInput');
   const sendBtn = document.getElementById('sendBtn');
   const voiceBtn = document.getElementById('voiceBtn');
+  const stopSpeechBtn = document.getElementById('stopSpeechBtn');
+  let chatHistory = [];
+  let currentUtterance = null;
 
-  // Dataset for keyword-based responses
+  // Dataset
   const dataset = [
     {
-      keywords: ['about', 'company', 'lalandi', 'conclusion', 'who is lalandi', 'what is lalandi'],
-      answer: `Lalandi Conclusion is a Cape Town-based software development company established in 2006. As a proud member of the Dutch Conclusion group, we have earned the trust of clients in Africa and Europe as their preferred technology partner. Our mission is to craft bespoke software solutions where code meets artistry, blending creativity and technical expertise to streamline and optimize business operations. We are part of a unique ecosystem with over 30 expert companies, a 79% fan score, 4500+ professionals, and 500+ clients, enabling us to solve problems individually or collaboratively.`
+      id: 'company-overview',
+      subtopics: [
+        {
+          keywords: ['lalandi', 'conclusion', 'who is lalandi', 'what is lalandi'],
+          weight: 2,
+          answer: `Lalandi Conclusion is a Cape Town-based software development company established in 2006, part of the Dutch Conclusion group. We are trusted by clients in Africa and Europe for bespoke software solutions that blend artistry and technical expertise.`
+        },
+        {
+          keywords: ['ecosystem', 'conclusion group', 'network'],
+          weight: 1,
+          answer: `As part of the Conclusion group, Lalandi operates in a unique ecosystem with over 30 expert companies, a 79% fan score, 4500+ professionals, and 500+ clients, enabling collaborative problem-solving.`
+        }
+      ]
     },
     {
-      keywords: ['devsecops', 'security', 'software development', 'automation', 'agile', 'lean'],
-      answer: `Our DevSecOps service at Lalandi Conclusion offers leadership, team training, continuous process improvement, and a repository for shared best practices, blueprints, and code. We use a standardized set of tools across automated delivery pipelines to ensure efficiency. Our development-centric approach integrates Engineering, Operations, and Security Compliance, addressing concerns like secure design, governance, and skills gaps. By incorporating Agile and Lean principles, we enable adaptive design, evolutionary development, early implementation, and rapid, flexible deployment of software changes.`
+      id: 'devsecops',
+      subtopics: [
+        {
+          keywords: ['devsecops', 'security', 'automation', 'agile', 'lean'],
+          weight: 2,
+          answer: `Lalandi’s DevSecOps service integrates Engineering, Operations, and Security Compliance using Agile and Lean principles, offering leadership, team training, and standardized tools for efficient software delivery.`
+        },
+        {
+          keywords: ['devsecops benefits', 'security benefits', 'why devsecops'],
+          weight: 1,
+          answer: `Our DevSecOps approach ensures rapid, secure software deployment by addressing secure design, governance, and skills gaps, promoting best practices across automated pipelines.`
+        }
+      ]
     },
     {
-      keywords: ['sap', 'sap team', 'sap services', 'system stability', 'incident management'],
-      answer: `Our SAP team at Lalandi Conclusion provides comprehensive assistance and maintenance for SAP systems, focusing on:
-1. **System Stability**: Monitoring performance to ensure availability and minimize downtime.
-2. **Incident Management**: Resolving user-reported issues like errors or data inconsistencies.
-3. **Change Management**: Implementing updates, patches, and upgrades while following strict processes.
-4. **User Support**: Assisting users with queries, navigation, and training.
-5. **System Monitoring**: Proactively identifying issues and performing maintenance like backups and optimizations.
-6. **Continuous Improvement**: Enhancing functionality and usability.
-7. **Documentation**: Maintaining detailed system records for consistency.
-8. **Collaboration**: Working with IT teams and stakeholders to resolve complex issues.
-These services drive efficiency, innovation, and growth for our clients.`
+      id: 'sap-services',
+      subtopics: [
+        {
+          keywords: ['sap', 'sap team', 'sap services'],
+          weight: 2,
+          answer: `Lalandi’s SAP team provides comprehensive support for SAP systems, focusing on stability, incident management, user support, and continuous improvement to drive efficiency and innovation.`
+        },
+        {
+          keywords: ['system stability', 'sap stability'],
+          weight: 1,
+          answer: `We ensure SAP system stability by monitoring performance, minimizing downtime, and proactively resolving technical issues.`
+        },
+        {
+          keywords: ['incident management', 'sap issues'],
+          weight: 1,
+          answer: `Our SAP team promptly resolves user-reported incidents like system errors or data inconsistencies to minimize business disruption.`
+        },
+        {
+          keywords: ['user support', 'sap training'],
+          weight: 1,
+          answer: `We provide timely user support, including query resolution, system navigation assistance, and training to maximize SAP system usage.`
+        }
+      ]
     },
     {
-      keywords: ['careers', 'jobs', 'work at lalandi', 'vacancies', 'join lalandi'],
-      answer: `Interested in working at Lalandi Conclusion? We offer opportunities to contribute to meaningful IT projects as part of a collaborative team. Based in Cape Town and part of the Conclusion group, we recruit top technical minds in Africa to craft strategic software solutions. Check our current vacancies to join our talented team and help optimize clients' business operations! Visit our careers page for more details: https://www.conclusion.nl/en/lalandi#careers`
+      id: 'careers',
+      subtopics: [
+        {
+          keywords: ['careers', 'jobs', 'work at lalandi', 'vacancies', 'join lalandi'],
+          weight: 2,
+          answer: `Join Lalandi Conclusion in Cape Town to work on meaningful IT projects with a collaborative team. Check our vacancies at https://www.conclusion.nl/en/lalandi#careers.`
+        }
+      ]
     },
     {
-      keywords: ['expertise', 'services', 'what we do', 'software', 'architecture', 'devops', 'consulting'],
-      answer: `Lalandi Conclusion specializes in:
-- **Software Development**: Building the right software with precision and artistry.
-- **Architecture**: Enabling business growth through proven solution architectures and technologies.
-- **DevOps**: Harmonizing collaboration, automation, and continuous improvement for software excellence.
-- **IT Consulting**: Leveraging cutting-edge technologies and strategic insights to optimize digital infrastructure, enhance efficiency, and drive innovation.
-Our talented team collaborates to deliver strategic solutions that streamline and optimize business operations.`
+      id: 'expertise',
+      subtopics: [
+        {
+          keywords: ['expertise', 'services', 'what we do', 'software', 'architecture', 'devops', 'consulting'],
+          weight: 2,
+          answer: `Lalandi specializes in software development, solution architecture, DevOps, and IT consulting to optimize business operations with cutting-edge technologies.`
+        },
+        {
+          keywords: ['software development', 'build software'],
+          weight: 1,
+          answer: `We build bespoke software solutions with precision and artistry to meet business needs.`
+        },
+        {
+          keywords: ['architecture', 'solution architecture'],
+          weight: 1,
+          answer: `Our proven solution architectures enable business growth through strategic technology applications.`
+        }
+      ]
     },
     {
-      keywords: ['oni charles', 'who is charles', 'oni', 'charles'],
-      answer: `Professional Summary: Oni Charles
-I am a self-taught Web3 developer with strong front-end and blockchain integration skills. My expertise includes:
-- **Languages & Libraries**: JavaScript, Solidity, Python, Ethers.js, Web3.js, IPFS, Moralis.
-- **Frontend**: React.js, Next.js, Bootstrap, Material-UI, Redux.
-- **Backend & Tools**: Node.js, Express.js, MongoDB, PostgreSQL, REST APIs.
-- **Blockchain**: Ethereum, BDAG (BlockDAG Testnet), Hardhat, Truffle.
-- **Smart Contracts**: Solidity, Hardhat, OpenZeppelin.
-- **Web3 Stack**: MetaMask, IPFS, Web3.Storage, Moralis.
-- **AI Tools**: OpenAI (DALL·E, GPT), Hugging Face (Stable Diffusion), ChatGPT, Gemini.
-I specialize in deploying full-stack decentralized applications (dApps) with smart contracts, authentication (MetaMask), and decentralized storage. I built this chatbot to showcase my ability to integrate AI APIs with web technologies.`
+      id: 'oni-charles',
+      subtopics: [
+        {
+          keywords: ['oni charles', 'who is charles', 'oni', 'charles'],
+          weight: 2,
+          answer: `Oni Charles is a self-taught Web3 developer skilled in JavaScript, Solidity, Python, React, Node.js, and AI tools like Gemini and OpenAI, with experience in building dApps and AI-driven solutions like this chatbot.`
+        },
+        {
+          keywords: ['blockchain', 'web3', 'smart contracts'],
+          weight: 1,
+          answer: `I specialize in Web3 development, deploying decentralized applications with Solidity, Hardhat, and Ethereum, integrated with MetaMask and IPFS.`
+        }
+      ]
     },
     {
-      keywords: ['portfolio', 'projects', 'work', 'examples'],
-      answer: `My Portfolio: Oni Charles
-I’ve built projects like:
-- This AI-powered chatbot, integrating the Gemini API with voice input/output.
-- A web scraper for extracting website content (e.g., Lalandi Conclusion data).
-- Decentralized applications using React, Solidity, and Ethereum for Web3 solutions.
-- Full-stack apps with Node.js, Express, and MongoDB.
-Ask me about specific projects to learn more, or check my GitHub for code samples!`
+      id: 'portfolio',
+      subtopics: [
+        {
+          keywords: ['portfolio', 'projects', 'work', 'examples'],
+          weight: 2,
+          answer: `Oni Charles’ portfolio includes this AI chatbot (Gemini API, Web Speech API), a web scraper for Lalandi data, and Web3 dApps using React and Solidity. Ask for details or check my GitHub!`
+        }
+      ]
     },
     {
-      keywords: ['ai skills', 'machine learning', 'ai expertise', 'chatbot skills'],
-      answer: `AI Skills Showcase: Oni Charles
-This chatbot demonstrates my ability to integrate the Gemini AI API with web technologies, combining natural language processing with voice input/output using the Web Speech API. I have experience with AI tools like OpenAI (GPT, DALL·E), Hugging Face (Stable Diffusion), ChatGPT, and Gemini, as well as building user-friendly interfaces with React and Next.js. My skills extend to scripting and automation with Python and JavaScript, making me versatile in delivering AI-driven solutions.`
+      id: 'ai-skills',
+      subtopics: [
+        {
+          keywords: ['ai skills', 'machine learning', 'ai expertise', 'chatbot skills'],
+          weight: 2,
+          answer: `I built this chatbot to showcase my AI skills, integrating the Gemini API with web technologies and Web Speech API for voice input/output, complemented by experience with OpenAI and Hugging Face.`
+        }
+      ]
     }
   ];
 
-  // Add message to chat window
-  function addMessage(text, sender) {
+  // Add message to chat window with truncation
+  function addMessage(text, sender, fullText = text) {
     const msgDiv = document.createElement('div');
     msgDiv.className = `message ${sender}`;
-    msgDiv.textContent = text;
+    const maxDisplayLength = 150;
+    if (text.length > maxDisplayLength) {
+      msgDiv.textContent = text.substring(0, maxDisplayLength);
+      msgDiv.classList.add('truncated');
+      msgDiv.onclick = () => {
+        msgDiv.textContent = fullText;
+        msgDiv.classList.remove('truncated');
+      };
+    } else {
+      msgDiv.textContent = text;
+    }
     chat.appendChild(msgDiv);
     chat.scrollTop = chat.scrollHeight;
+    chatHistory.push({ sender, text: fullText });
+    if (chatHistory.length > 10) chatHistory.shift(); // Keep last 10 messages
   }
 
   // Speak text aloud
   function speak(text) {
     if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'en-US';
-      utterance.rate = 1.0;
-      window.speechSynthesis.speak(utterance);
+      window.speechSynthesis.cancel(); // Stop any ongoing speech
+      currentUtterance = new SpeechSynthesisUtterance(text);
+      currentUtterance.lang = 'en-US';
+      currentUtterance.rate = 1.0;
+      window.speechSynthesis.speak(currentUtterance);
     } else {
       addMessage('Text-to-speech not supported in this browser.', 'error');
     }
   }
+
+  // Stop speech
+  stopSpeechBtn.addEventListener('click', () => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      currentUtterance = null;
+    }
+  });
 
   // Voice recognition setup
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -160,37 +304,50 @@ This chatbot demonstrates my ability to integrate the Gemini AI API with web tec
     voiceBtn.textContent = 'Voice Not Supported';
   }
 
-  // Improved keyword matching
+  // Advanced keyword matching with scoring
   function checkDataset(input) {
     const lowerInput = input.toLowerCase().trim();
     const inputWords = lowerInput.split(/\s+/);
     console.log('Checking dataset for:', lowerInput);
 
+    let bestMatch = null;
+    let highestScore = 0;
+
     for (const entry of dataset) {
-      const matched = entry.keywords.some(keyword => {
-        const keywordLower = keyword.toLowerCase();
-        // Check if keyword is a phrase or single word
-        if (keywordLower.includes(' ')) {
-          return lowerInput.includes(keywordLower);
+      for (const subtopic of entry.subtopics) {
+        let score = 0;
+        subtopic.keywords.forEach(keyword => {
+          const keywordLower = keyword.toLowerCase();
+          if (keywordLower.includes(' ')) {
+            if (lowerInput.includes(keywordLower)) score += subtopic.weight * 2;
+          } else {
+            if (inputWords.some(word => word.includes(keywordLower) || keywordLower.includes(word))) {
+              score += subtopic.weight;
+            }
+          }
+        });
+        console.log(`Subtopic: ${subtopic.answer.substring(0, 30)}..., Score: ${score}`);
+        if (score > highestScore) {
+          highestScore = score;
+          bestMatch = subtopic.answer;
         }
-        // Check if any input word matches the keyword
-        return inputWords.some(word => word.includes(keywordLower) || keywordLower.includes(word));
-      });
-      if (matched) {
-        console.log('Dataset match found:', entry.answer);
-        return entry.answer;
       }
+    }
+
+    if (highestScore > 0) {
+      console.log('Dataset match found:', bestMatch);
+      return bestMatch;
     }
     console.log('No dataset match, falling back to API');
     return null;
   }
 
-  // Call Gemini API with context and rate limit delay
+  // Call Gemini API with context and history
   let lastApiCall = 0;
   async function callGeminiAPI(userText) {
-    const apiKey = 'YOUR_ACTUAL_GEMINI_API_KEY'; // Replace with your valid Gemini API key
+    const apiKey = 'AIzaSyD1rrdR9nJs3TJCFYNlp1FfFWwhcJxoImo'; // Replace with your valid Gemini API key
     const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
-    const minDelay = 4000; // 4 seconds to avoid rate limits (15 RPM)
+    const minDelay = 4000; // 4 seconds to avoid rate limits
 
     // Enforce minimum delay
     const now = Date.now();
@@ -199,12 +356,26 @@ This chatbot demonstrates my ability to integrate the Gemini AI API with web tec
       await new Promise(resolve => setTimeout(resolve, minDelay - timeSinceLast));
     }
 
-    // Add context about Lalandi Conclusion
-    const context = `You are an AI assistant for Lalandi Conclusion, a Cape Town-based software development company part of the Dutch Conclusion group. Focus on providing information about their services (DevSecOps, SAP, software development, IT consulting), company details, or my portfolio as Oni Charles. If the query is unrelated, provide a general but concise response.`;
-    const fullText = `${context}\n\nUser query: ${userText}`;
+    // Build context with dataset and history
+    const datasetContext = dataset.map(entry => 
+      entry.subtopics.map(sub => sub.answer).join('\n')
+    ).join('\n\n');
+    const historyContext = chatHistory
+      .slice(-4)
+      .map(msg => `${msg.sender === 'user' ? 'User' : 'Assistant'}: ${msg.text}`)
+      .join('\n');
+    const prompt = `You are an AI assistant for Lalandi Conclusion, a Cape Town-based software development company. Use the following knowledge base to answer queries precisely in 2-3 sentences, focusing on Lalandi’s services (DevSecOps, SAP, software development, IT consulting), company details, or Oni Charles’ portfolio. If the query is unrelated, provide a concise general response.
+
+Knowledge Base:
+${datasetContext}
+
+Chat History:
+${historyContext}
+
+User Query: ${userText}`;
 
     const body = {
-      contents: [{ parts: [{ text: fullText }] }]
+      contents: [{ parts: [{ text: prompt }] }]
     };
 
     try {
@@ -247,7 +418,7 @@ This chatbot demonstrates my ability to integrate the Gemini AI API with web tec
     // Check dataset first
     const datasetReply = checkDataset(input);
     if (datasetReply) {
-      addMessage(datasetReply, 'agent');
+      addMessage(datasetReply, 'agent', datasetReply);
       speak(datasetReply);
       return;
     }
@@ -256,7 +427,7 @@ This chatbot demonstrates my ability to integrate the Gemini AI API with web tec
     addMessage('Thinking...', 'agent');
     const aiReply = await callGeminiAPI(input);
     chat.lastChild.remove(); // Remove "Thinking..." message
-    addMessage(aiReply, 'agent');
+    addMessage(aiReply, 'agent', aiReply);
     speak(aiReply);
   }
 
@@ -269,14 +440,14 @@ This chatbot demonstrates my ability to integrate the Gemini AI API with web tec
     if (recognition) recognition.start();
   });
 
-  // Welcome message with suggested queries
+  // Welcome message
   addMessage(
     `Welcome to Oni Charles' AI Chat Agent! Ask about:
-- Lalandi Conclusion (e.g., "What is Lalandi?", "Tell me about the company")
-- DevSecOps or SAP services
-- Careers at Lalandi
-- My portfolio or AI skills (e.g., "Who is Oni Charles?", "What are your projects?")
-Try the 🎤 button for voice input!`,
+- Lalandi Conclusion (e.g., "What is Lalandi?", "SAP services")
+- DevSecOps or SAP specifics (e.g., "Why DevSecOps?", "SAP stability")
+- Careers at Lalandi (e.g., "Jobs at Lalandi")
+- My portfolio (e.g., "Who is Oni Charles?", "Show projects")
+Use the 🎤 for voice input or "Stop Speech" to pause narration.`,
     'agent'
   );
 
