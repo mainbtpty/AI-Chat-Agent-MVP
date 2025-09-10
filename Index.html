@@ -21,12 +21,12 @@
 </head>
 <body>
 
-<h2>AI Chat Agent MVP</h2>
+<h2>AI Chat Agent MVP by Oni Charles</h2>
 
 <div id="chat"></div>
 
 <div id="inputArea">
-  <input type="text" id="userInput" placeholder="Type your message..." />
+  <input type="text" id="userInput" placeholder="Ask about Lalandi, DevSecOps, SAP, or my portfolio..." />
   <button id="sendBtn">Send</button>
   <button id="voiceBtn">🎤</button>
 </div>
@@ -40,34 +40,66 @@
   // Dataset for keyword-based responses
   const dataset = [
     {
-      keywords: ['about', 'company', 'Lalandi', 'software development'],
-      answer: `Lalandi Conclusion is a Cape Town based software development company
-
-established in 2006.  As a proud member of the Dutch Conclusion group, they have earned the trust of clients in Africa and Europe as their preferred technology partner.
-
-Lalandi expertise includes developing the right software solutions for  businesses and integrating complex systems.`
+      keywords: ['about', 'company', 'lalandi', 'conclusion', 'who is lalandi', 'what is lalandi'],
+      answer: `Lalandi Conclusion is a Cape Town-based software development company established in 2006. As a proud member of the Dutch Conclusion group, we have earned the trust of clients in Africa and Europe as their preferred technology partner. Our mission is to craft bespoke software solutions where code meets artistry, blending creativity and technical expertise to streamline and optimize business operations. We are part of a unique ecosystem with over 30 expert companies, a 79% fan score, 4500+ professionals, and 500+ clients, enabling us to solve problems individually or collaboratively.`
     },
     {
-      keywords: ['cases', 'devsecops', 'project'],
-      answer: `Cases - Project cases
-
-The Power of DevSecOps: Achieving Speed and Security in Software Development
-Explore how DevSecOps revolutionizes software development by prioritizing both speed and security.`
+      keywords: ['devsecops', 'security', 'software development', 'automation', 'agile', 'lean'],
+      answer: `Our DevSecOps service at Lalandi Conclusion offers leadership, team training, continuous process improvement, and a repository for shared best practices, blueprints, and code. We use a standardized set of tools across automated delivery pipelines to ensure efficiency. Our development-centric approach integrates Engineering, Operations, and Security Compliance, addressing concerns like secure design, governance, and skills gaps. By incorporating Agile and Lean principles, we enable adaptive design, evolutionary development, early implementation, and rapid, flexible deployment of software changes.`
     },
     {
-      keywords: ['about us', 'team', 'developers'],
-      answer: `ABOUT US
-They are continuously sourcing exceptional developers who posses a unique blend of creativity, innovation, and strategic thinking, as they bring a touch of artistry to their coding.`
+      keywords: ['sap', 'sap team', 'sap services', 'system stability', 'incident management'],
+      answer: `Our SAP team at Lalandi Conclusion provides comprehensive assistance and maintenance for SAP systems, focusing on:
+1. **System Stability**: Monitoring performance to ensure availability and minimize downtime.
+2. **Incident Management**: Resolving user-reported issues like errors or data inconsistencies.
+3. **Change Management**: Implementing updates, patches, and upgrades while following strict processes.
+4. **User Support**: Assisting users with queries, navigation, and training.
+5. **System Monitoring**: Proactively identifying issues and performing maintenance like backups and optimizations.
+6. **Continuous Improvement**: Enhancing functionality and usability.
+7. **Documentation**: Maintaining detailed system records for consistency.
+8. **Collaboration**: Working with IT teams and stakeholders to resolve complex issues.
+These services drive efficiency, innovation, and growth for our clients.`
     },
     {
-      keywords: ['ai skills', 'machine learning', 'expertise'],
-      answer: `AI SKILLS SHOWCASE
-This chatbot demonstrates my ability to integrate the Gemini AI API with web technologies, combining natural language processing with voice input/output. I have experience with AI APIs, web development, and building user-friendly interfaces.`
+      keywords: ['careers', 'jobs', 'work at lalandi', 'vacancies', 'join lalandi'],
+      answer: `Interested in working at Lalandi Conclusion? We offer opportunities to contribute to meaningful IT projects as part of a collaborative team. Based in Cape Town and part of the Conclusion group, we recruit top technical minds in Africa to craft strategic software solutions. Check our current vacancies to join our talented team and help optimize clients' business operations! Visit our careers page for more details: https://www.conclusion.nl/en/lalandi#careers`
     },
     {
-      keywords: ['portfolio', 'projects', 'work'],
-      answer: `MY PORTFOLIO
-I've built projects like this AI-powered chatbot, a web scraper for extracting website content, and other applications integrating APIs and modern JavaScript. Ask me about specific projects to learn more!`
+      keywords: ['expertise', 'services', 'what we do', 'software', 'architecture', 'devops', 'consulting'],
+      answer: `Lalandi Conclusion specializes in:
+- **Software Development**: Building the right software with precision and artistry.
+- **Architecture**: Enabling business growth through proven solution architectures and technologies.
+- **DevOps**: Harmonizing collaboration, automation, and continuous improvement for software excellence.
+- **IT Consulting**: Leveraging cutting-edge technologies and strategic insights to optimize digital infrastructure, enhance efficiency, and drive innovation.
+Our talented team collaborates to deliver strategic solutions that streamline and optimize business operations.`
+    },
+    {
+      keywords: ['oni charles', 'who is charles', 'oni', 'charles'],
+      answer: `Professional Summary: Oni Charles
+I am a self-taught Web3 developer with strong front-end and blockchain integration skills. My expertise includes:
+- **Languages & Libraries**: JavaScript, Solidity, Python, Ethers.js, Web3.js, IPFS, Moralis.
+- **Frontend**: React.js, Next.js, Bootstrap, Material-UI, Redux.
+- **Backend & Tools**: Node.js, Express.js, MongoDB, PostgreSQL, REST APIs.
+- **Blockchain**: Ethereum, BDAG (BlockDAG Testnet), Hardhat, Truffle.
+- **Smart Contracts**: Solidity, Hardhat, OpenZeppelin.
+- **Web3 Stack**: MetaMask, IPFS, Web3.Storage, Moralis.
+- **AI Tools**: OpenAI (DALL·E, GPT), Hugging Face (Stable Diffusion), ChatGPT, Gemini.
+I specialize in deploying full-stack decentralized applications (dApps) with smart contracts, authentication (MetaMask), and decentralized storage. I built this chatbot to showcase my ability to integrate AI APIs with web technologies.`
+    },
+    {
+      keywords: ['portfolio', 'projects', 'work', 'examples'],
+      answer: `My Portfolio: Oni Charles
+I’ve built projects like:
+- This AI-powered chatbot, integrating the Gemini API with voice input/output.
+- A web scraper for extracting website content (e.g., Lalandi Conclusion data).
+- Decentralized applications using React, Solidity, and Ethereum for Web3 solutions.
+- Full-stack apps with Node.js, Express, and MongoDB.
+Ask me about specific projects to learn more, or check my GitHub for code samples!`
+    },
+    {
+      keywords: ['ai skills', 'machine learning', 'ai expertise', 'chatbot skills'],
+      answer: `AI Skills Showcase: Oni Charles
+This chatbot demonstrates my ability to integrate the Gemini AI API with web technologies, combining natural language processing with voice input/output using the Web Speech API. I have experience with AI tools like OpenAI (GPT, DALL·E), Hugging Face (Stable Diffusion), ChatGPT, and Gemini, as well as building user-friendly interfaces with React and Next.js. My skills extend to scripting and automation with Python and JavaScript, making me versatile in delivering AI-driven solutions.`
     }
   ];
 
@@ -84,6 +116,8 @@ I've built projects like this AI-powered chatbot, a web scraper for extracting w
   function speak(text) {
     if ('speechSynthesis' in window) {
       const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'en-US';
+      utterance.rate = 1.0;
       window.speechSynthesis.speak(utterance);
     } else {
       addMessage('Text-to-speech not supported in this browser.', 'error');
@@ -126,15 +160,21 @@ I've built projects like this AI-powered chatbot, a web scraper for extracting w
     voiceBtn.textContent = 'Voice Not Supported';
   }
 
-  // Check dataset for keyword matches
+  // Improved keyword matching
   function checkDataset(input) {
     const lowerInput = input.toLowerCase().trim();
+    const inputWords = lowerInput.split(/\s+/);
     console.log('Checking dataset for:', lowerInput);
+
     for (const entry of dataset) {
       const matched = entry.keywords.some(keyword => {
-        const match = lowerInput.includes(keyword.toLowerCase());
-        console.log(`Keyword: ${keyword}, Match: ${match}`);
-        return match;
+        const keywordLower = keyword.toLowerCase();
+        // Check if keyword is a phrase or single word
+        if (keywordLower.includes(' ')) {
+          return lowerInput.includes(keywordLower);
+        }
+        // Check if any input word matches the keyword
+        return inputWords.some(word => word.includes(keywordLower) || keywordLower.includes(word));
       });
       if (matched) {
         console.log('Dataset match found:', entry.answer);
@@ -145,22 +185,26 @@ I've built projects like this AI-powered chatbot, a web scraper for extracting w
     return null;
   }
 
-  // Call Gemini API with rate limit delay
+  // Call Gemini API with context and rate limit delay
   let lastApiCall = 0;
   async function callGeminiAPI(userText) {
-    const apiKey = 'AIzaSyD1rrdR9nJs3TJCFYNlp1FfFWwhcJxoImo'; // Replace with your actual Gemini API key
+    const apiKey = 'YOUR_ACTUAL_GEMINI_API_KEY'; // Replace with your valid Gemini API key
     const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
-    const minDelay = 4000; // 4 seconds to avoid rate limits (15 RPM = 4s per request)
+    const minDelay = 4000; // 4 seconds to avoid rate limits (15 RPM)
 
-    // Enforce minimum delay to prevent 429 errors
+    // Enforce minimum delay
     const now = Date.now();
     const timeSinceLast = now - lastApiCall;
     if (timeSinceLast < minDelay) {
       await new Promise(resolve => setTimeout(resolve, minDelay - timeSinceLast));
     }
 
+    // Add context about Lalandi Conclusion
+    const context = `You are an AI assistant for Lalandi Conclusion, a Cape Town-based software development company part of the Dutch Conclusion group. Focus on providing information about their services (DevSecOps, SAP, software development, IT consulting), company details, or my portfolio as Oni Charles. If the query is unrelated, provide a general but concise response.`;
+    const fullText = `${context}\n\nUser query: ${userText}`;
+
     const body = {
-      contents: [{ parts: [{ text: userText }] }]
+      contents: [{ parts: [{ text: fullText }] }]
     };
 
     try {
@@ -225,8 +269,16 @@ I've built projects like this AI-powered chatbot, a web scraper for extracting w
     if (recognition) recognition.start();
   });
 
-  // Welcome message
-  addMessage('Welcome to Charles Oni AI Chat Agent! Ask about Lalandi Conclusion Company, AI skills, or anything else. Try voice input with the 🎤 button.', 'agent');
+  // Welcome message with suggested queries
+  addMessage(
+    `Welcome to Oni Charles' AI Chat Agent! Ask about:
+- Lalandi Conclusion (e.g., "What is Lalandi?", "Tell me about the company")
+- DevSecOps or SAP services
+- Careers at Lalandi
+- My portfolio or AI skills (e.g., "Who is Oni Charles?", "What are your projects?")
+Try the 🎤 button for voice input!`,
+    'agent'
+  );
 
 </script>
 
