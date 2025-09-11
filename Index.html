@@ -5,76 +5,81 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AI Chat Agent MVP by Oni Charles</title>
   <style>
-    body { 
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
-      max-width: 600px; 
-      margin: 20px auto; 
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 600px;
+      margin: 20px auto;
       background: #f5f5f5;
     }
     h2 { color: #2c3e50; }
-    #chat { 
-      border: 1px solid #ddd; 
-      padding: 15px; 
-      height: 400px; 
-      overflow-y: auto; 
-      background: #fff; 
+    #chat {
+      border: 1px solid #ddd;
+      padding: 15px;
+      height: 400px;
+      overflow-y: auto;
+      background: #fff;
       border-radius: 8px;
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
-    .message { 
-      margin: 10px 0; 
-      padding: 10px; 
-      border-radius: 8px; 
+    .message {
+      margin: 10px 0;
+      padding: 10px;
+      border-radius: 8px;
       animation: fadeIn 0.3s ease-in;
     }
-    .user { 
-      text-align: right; 
-      color: #2c3e50; 
-      background: #e3f2fd; 
+    .user {
+      text-align: right;
+      color: #2c3e50;
+      background: #e3f2fd;
     }
-    .agent { 
-      text-align: left; 
-      color: #1a5c37; 
-      background: #e8f5e9; 
+    .agent {
+      text-align: left;
+      color: #1a5c37;
+      background: #e8f5e9;
     }
-    .error { 
-      text-align: left; 
-      color: #d32f2f; 
-      background: #ffebee; 
+    .error {
+      text-align: left;
+      color: #d32f2f;
+      background: #ffebee;
     }
-    #inputArea { 
-      margin-top: 15px; 
-      display: flex; 
-      gap: 10px; 
+    #inputArea {
+      margin-top: 15px;
+      display: flex;
+      gap: 10px;
       align-items: center;
     }
-    #userInput { 
-      width: 70%; 
-      padding: 8px; 
-      border: 1px solid #ddd; 
-      border-radius: 4px; 
+    #userInput {
+      width: 70%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
       font-size: 16px;
     }
-    #sendBtn, #voiceBtn, #stopSpeechBtn { 
-      padding: 8px 12px; 
-      border: none; 
-      border-radius: 4px; 
-      cursor: pointer; 
-      background: #1976d2; 
-      color: #fff; 
+    #sendBtn, #voiceBtn, #stopSpeechBtn {
+      padding: 8px 12px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      background: #1976d2;
+      color: #fff;
       font-size: 14px;
     }
     #voiceBtn.listening { background: #d81b60; }
     #stopSpeechBtn { background: #d32f2f; }
-    .loading::after { 
-      content: '⏳'; 
-      animation: spin 1s infinite; 
+    .loading::after {
+      content: '⏳';
+      animation: spin 1s infinite;
       margin-left: 5px;
     }
-    .truncated::after { 
-      content: '... [Show more]'; 
-      color: #1976d2; 
+    .truncated::after {
+      content: '... [Show more]';
+      color: #1976d2;
       cursor: pointer;
+    }
+    .highlight {
+      background: #fff3cd;
+      padding: 2px 4px;
+      border-radius: 3px;
     }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     @keyframes spin { 100% { transform: rotate(360deg); } }
@@ -84,13 +89,13 @@
 
 <h2>AI Chat Agent MVP by Oni Charles</h2>
 
-<div id="chat"></div>
+<div id="chat" role="log" aria-live="polite"></div>
 
 <div id="inputArea">
-  <input type="text" id="userInput" placeholder="Ask about Lalandi, DevSecOps, SAP, or my portfolio..." />
+  <input type="text" id="userInput" placeholder="Ask about Lalandi, DevSecOps, SAP, or my portfolio..." aria-label="Chat input" />
   <button id="sendBtn">Send</button>
-  <button id="voiceBtn">🎤</button>
-  <button id="stopSpeechBtn">Stop Speech</button>
+  <button id="voiceBtn" aria-label="Start voice input">🎤</button>
+  <button id="stopSpeechBtn" aria-label="Stop speech">Stop Speech</button>
 </div>
 
 <script>
@@ -101,6 +106,7 @@
   const stopSpeechBtn = document.getElementById('stopSpeechBtn');
   let chatHistory = [];
   let currentUtterance = null;
+  let lastMatchedId = null; // Track last matched dataset ID for follow-ups
 
   // Dataset
   const dataset = [
@@ -108,14 +114,19 @@
       id: 'company-overview',
       subtopics: [
         {
-          keywords: ['lalandi', 'conclusion', 'who is lalandi', 'what is lalandi', 'what do they do'],
+          keywords: ['lalandi', 'conclusion', 'who is lalandi', 'what is lalandi', 'lalandi conclusion', 'about lalandi'],
           weight: 2,
-          answer: `Lalandi Conclusion is a Cape Town-based software development company established in 2006, part of the Dutch Conclusion group. We are trusted by clients in Africa and Europe for bespoke software solutions that blend artistry and technical expertise.`
+          answer: `Lalandi Conclusion, established in 2006 in Cape Town, is a software development company within the Dutch Conclusion group, delivering bespoke solutions that blend artistry and technical expertise to clients in Africa and Europe.`
         },
         {
-          keywords: ['ecosystem', 'conclusion group', 'network'],
+          keywords: ['ecosystem', 'conclusion group', 'network', 'collaboration'],
           weight: 1,
-          answer: `As part of the Conclusion group, Lalandi operates in a unique ecosystem with over 30 expert companies, a 79% fan score, 4500+ professionals, and 500+ clients, enabling collaborative problem-solving.`
+          answer: `Lalandi operates within the Conclusion group’s ecosystem, comprising over 30 expert companies, 4500+ professionals, 500+ clients, and a 79% fan score, enabling collaborative and innovative problem-solving.`
+        },
+        {
+          keywords: ['team', 'farzaana', 'marcel', 'taureen', 'lalandi team'],
+          weight: 1,
+          answer: `Lalandi’s team includes experts like Farzaana, Marcel, and Taureen, who contribute to crafting strategic software solutions with creativity and precision.`
         }
       ]
     },
@@ -123,14 +134,14 @@
       id: 'devsecops',
       subtopics: [
         {
-          keywords: ['devsecops', 'security', 'automation', 'agile', 'lean'],
+          keywords: ['devsecops', 'security', 'automation', 'agile', 'lean', 'devops'],
           weight: 2,
-          answer: `Lalandi’s DevSecOps service integrates Engineering, Operations, and Security Compliance using Agile and Lean principles, offering leadership, team training, and standardized tools for efficient software delivery.`
+          answer: `Lalandi’s DevSecOps service integrates Engineering, Operations, and Security Compliance using Agile and Lean principles, offering leadership, training, and standardized tools for efficient, secure software delivery.`
         },
         {
-          keywords: ['devsecops benefits', 'security benefits', 'why devsecops'],
+          keywords: ['devsecops benefits', 'security benefits', 'why devsecops', 'devsecops advantages'],
           weight: 1,
-          answer: `Our DevSecOps approach ensures rapid, secure software deployment by addressing secure design, governance, and skills gaps, promoting best practices across automated pipelines.`
+          answer: `Our DevSecOps approach ensures rapid, secure software deployment by addressing design, governance, and skills gaps, with standardized tools and best practices.`
         }
       ]
     },
@@ -138,24 +149,30 @@
       id: 'sap-services',
       subtopics: [
         {
-          keywords: ['sap', 'sap team', 'sap services'],
+          keywords: ['sap', 'sap team', 'sap services', 'sap system'],
           weight: 2,
           answer: `Lalandi’s SAP team provides comprehensive support for SAP systems, focusing on stability, incident management, user support, and continuous improvement to drive efficiency and innovation.`
         },
         {
-          keywords: ['system stability', 'sap stability'],
+          keywords: ['system stability', 'sap stability', 'sap performance'],
           weight: 1,
           answer: `We ensure SAP system stability by monitoring performance, minimizing downtime, and proactively resolving technical issues.`
         },
         {
-          keywords: ['incident management', 'sap issues'],
+        {
+          keywords: ['incident management', 'sap issues', 'sap errors'],
           weight: 1,
-          answer: `Our SAP team promptly resolves user-reported incidents like system errors or data inconsistencies to minimize business disruption.`
+          answer: `Our SAP team resolves user-reported incidents like system errors or data inconsistencies to minimize business disruption.`
         },
         {
-          keywords: ['user support', 'sap training'],
+          keywords: ['user support', 'sap training', 'sap help'],
           weight: 1,
-          answer: `We provide timely user support, including query resolution, system navigation assistance, and training to maximize SAP system usage.`
+          answer: `We offer timely SAP user support, including query resolution, navigation assistance, and training to maximize system usage.`
+        },
+        {
+          keywords: ['change management', 'sap updates', 'sap upgrades'],
+          weight: 1,
+          answer: `Lalandi manages SAP system changes, including patches and upgrades, adhering to strict change management processes.`
         }
       ]
     },
@@ -163,7 +180,7 @@
       id: 'careers',
       subtopics: [
         {
-          keywords: ['careers', 'jobs', 'work at lalandi', 'vacancies', 'join lalandi'],
+          keywords: ['careers', 'jobs', 'work at lalandi', 'vacancies', 'join lalandi', 'employment'],
           weight: 2,
           answer: `Join Lalandi Conclusion in Cape Town to work on meaningful IT projects with a collaborative team. Check our vacancies at https://www.conclusion.nl/en/lalandi#careers.`
         }
@@ -173,19 +190,24 @@
       id: 'expertise',
       subtopics: [
         {
-          keywords: ['expertise', 'services', 'what we do', 'software', 'architecture', 'devops', 'consulting'],
+          keywords: ['expertise', 'services', 'what we do', 'lalandi services', 'software', 'architecture', 'devops', 'consulting'],
           weight: 2,
           answer: `Lalandi specializes in software development, solution architecture, DevOps, and IT consulting to optimize business operations with cutting-edge technologies.`
         },
         {
-          keywords: ['software development', 'build software'],
+          keywords: ['software development', 'build software', 'software solutions'],
           weight: 1,
           answer: `We build bespoke software solutions with precision and artistry to meet business needs.`
         },
         {
-          keywords: ['architecture', 'solution architecture'],
+          keywords: ['architecture', 'solution architecture', 'system architecture'],
           weight: 1,
           answer: `Our proven solution architectures enable business growth through strategic technology applications.`
+        },
+        {
+          keywords: ['it consulting', 'consulting services', 'tech consulting'],
+          weight: 1,
+          answer: `Lalandi’s IT consulting leverages cutting-edge technologies to optimize digital infrastructure and drive innovation.`
         }
       ]
     },
@@ -193,12 +215,12 @@
       id: 'oni-charles',
       subtopics: [
         {
-          keywords: ['oni charles', 'who is charles', 'oni', 'charles', 'what does Charles do', 'who build this app', 'kolapo',],
+          keywords: ['oni charles', 'who is charles', 'oni', 'charles', 'kolapo', 'who built this app', 'developer'],
           weight: 2,
           answer: `Oni Charles is a self-taught Web3 developer skilled in JavaScript, Solidity, Python, React, Node.js, and AI tools like Gemini and OpenAI, with experience in building dApps and AI-driven solutions like this chatbot.`
         },
         {
-          keywords: ['blockchain', 'web3', 'smart contracts'],
+          keywords: ['blockchain', 'web3', 'smart contracts', 'decentralized apps'],
           weight: 1,
           answer: `I specialize in Web3 development, deploying decentralized applications with Solidity, Hardhat, and Ethereum, integrated with MetaMask and IPFS.`
         }
@@ -208,7 +230,7 @@
       id: 'portfolio',
       subtopics: [
         {
-          keywords: ['portfolio', 'projects', 'work', 'examples'],
+          keywords: ['portfolio', 'projects', 'work', 'examples', 'oni projects'],
           weight: 2,
           answer: `Oni Charles’ portfolio includes this AI chatbot (Gemini API, Web Speech API), a web scraper for Lalandi data, and Web3 dApps using React and Solidity. Ask for details or check my GitHub!`
         }
@@ -218,39 +240,137 @@
       id: 'ai-skills',
       subtopics: [
         {
-          keywords: ['ai skills', 'machine learning', 'ai expertise', 'chatbot skills'],
+          keywords: ['ai skills', 'machine learning', 'ai expertise', 'chatbot skills', 'ai development'],
           weight: 2,
-          answer: `I built this chatbot to showcase my AI skills, integrating the Gemini API with web technologies and Web Speech API for voice input/output, complemented by experience with OpenAI and Hugging Face.`
+          answer: `I built this chatbot to showcase my AI skills, integrating the Gemini API with web technologies and Web Speech API, complemented by experience with OpenAI and Hugging Face.`
+        }
+      ]
+    },
+    {
+      id: 'greeting',
+      subtopics: [
+        {
+          keywords: ['hello', 'how are you', 'what are you up to', 'hi', 'hello there'],
+          weight: 2,
+          answer: `Hi! I'm Oni Charles' AI Chat Agent. Ask about Lalandi Conclusion, DevSecOps, SAP, careers, or my portfolio. Use the 🎤 for voice input or "Stop Speech" to pause narration.`
         }
       ]
     }
   ];
 
-  // Add message to chat window with truncation
+  // Simple fuzzy matching (Levenshtein distance)
+  function levenshtein(a, b) {
+    const matrix = Array(b.length + 1).fill().map(() => Array(a.length + 1).fill(0));
+    for (let i = 0; i <= a.length; i++) matrix[0][i] = i;
+    for (let j = 0; j <= b.length; j++) matrix[j][0] = j;
+    for (let j = 1; j <= b.length; j++) {
+      for (let i = 1; i <= a.length; i++) {
+        const indicator = a[i - 1] === b[j - 1] ? 0 : 1;
+        matrix[j][i] = Math.min(
+          matrix[j][i - 1] + 1,
+          matrix[j - 1][i] + 1,
+          matrix[j - 1][i - 1] + indicator
+        );
+      }
+    }
+    return matrix[b.length][a.length];
+  }
+
+  // Advanced keyword matching with fuzzy matching
+  function checkDataset(input) {
+    const lowerInput = input.toLowerCase().trim();
+    const inputWords = lowerInput.split(/\s+/);
+    console.log('Checking dataset for:', lowerInput);
+
+    let bestMatch = null;
+    let highestScore = 0;
+    let matchedId = null;
+
+    // Check for follow-up queries
+    const isFollowUp = lowerInput.includes('more') || lowerInput.includes('tell me more') || lowerInput.includes('expand');
+    if (isFollowUp && lastMatchedId) {
+      const lastEntry = dataset.find(entry => entry.id === lastMatchedId);
+      if (lastEntry) {
+        const longestAnswer = lastEntry.subtopics.reduce((prev, curr) => 
+          prev.answer.length > curr.answer.length ? prev : curr
+        );
+        console.log('Follow-up detected, returning:', longestAnswer.answer);
+        return longestAnswer.answer;
+      }
+    }
+
+    for (const entry of dataset) {
+      for (const subtopic of entry.subtopics) {
+        let score = 0;
+        subtopic.keywords.forEach(keyword => {
+          const keywordLower = keyword.toLowerCase();
+          if (keywordLower.includes(' ')) {
+            if (lowerInput.includes(keywordLower)) score += subtopic.weight * 3; // Boost for exact phrase
+          } else {
+            inputWords.forEach(word => {
+              if (word.includes(keywordLower) || keywordLower.includes(word)) {
+                score += subtopic.weight;
+              } else if (levenshtein(word, keywordLower) <= 2) { // Fuzzy match
+                score += subtopic.weight * 0.5;
+              }
+            });
+          }
+        });
+        console.log(`Subtopic: ${subtopic.answer.substring(0, 30)}..., Score: ${score}`);
+        if (score > highestScore) {
+          highestScore = score;
+          bestMatch = subtopic.answer;
+          matchedId = entry.id;
+        }
+      }
+    }
+
+    if (highestScore > 1) { // Require minimum score to avoid weak matches
+      console.log('Dataset match found:', bestMatch);
+      lastMatchedId = matchedId;
+      return bestMatch;
+    }
+    console.log('No dataset match, falling back to API');
+    lastMatchedId = null;
+    return null;
+  }
+
+  // Add message with keyword highlighting
   function addMessage(text, sender, fullText = text) {
     const msgDiv = document.createElement('div');
     msgDiv.className = `message ${sender}`;
     const maxDisplayLength = 150;
+    let displayText = text;
+    
+    // Highlight matched keywords
+    const inputWords = userInput.value.toLowerCase().trim().split(/\s+/);
+    inputWords.forEach(word => {
+      if (word.length > 3) { // Only highlight longer words
+        const regex = new RegExp(`\\b${word}\\b`, 'gi');
+        displayText = displayText.replace(regex, `<span class="highlight">${word}</span>`);
+      }
+    });
+
     if (text.length > maxDisplayLength) {
-      msgDiv.textContent = text.substring(0, maxDisplayLength);
+      msgDiv.innerHTML = displayText.substring(0, maxDisplayLength);
       msgDiv.classList.add('truncated');
       msgDiv.onclick = () => {
-        msgDiv.textContent = fullText;
+        msgDiv.innerHTML = displayText;
         msgDiv.classList.remove('truncated');
       };
     } else {
-      msgDiv.textContent = text;
+      msgDiv.innerHTML = displayText;
     }
     chat.appendChild(msgDiv);
     chat.scrollTop = chat.scrollHeight;
     chatHistory.push({ sender, text: fullText });
-    if (chatHistory.length > 10) chatHistory.shift(); // Keep last 10 messages
+    if (chatHistory.length > 10) chatHistory.shift();
   }
 
   // Speak text aloud
   function speak(text) {
     if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel(); // Stop any ongoing speech
+      window.speechSynthesis.cancel();
       currentUtterance = new SpeechSynthesisUtterance(text);
       currentUtterance.lang = 'en-US';
       currentUtterance.rate = 1.0;
@@ -304,50 +424,12 @@
     voiceBtn.textContent = 'Voice Not Supported';
   }
 
-  // Advanced keyword matching with scoring
-  function checkDataset(input) {
-    const lowerInput = input.toLowerCase().trim();
-    const inputWords = lowerInput.split(/\s+/);
-    console.log('Checking dataset for:', lowerInput);
-
-    let bestMatch = null;
-    let highestScore = 0;
-
-    for (const entry of dataset) {
-      for (const subtopic of entry.subtopics) {
-        let score = 0;
-        subtopic.keywords.forEach(keyword => {
-          const keywordLower = keyword.toLowerCase();
-          if (keywordLower.includes(' ')) {
-            if (lowerInput.includes(keywordLower)) score += subtopic.weight * 2;
-          } else {
-            if (inputWords.some(word => word.includes(keywordLower) || keywordLower.includes(word))) {
-              score += subtopic.weight;
-            }
-          }
-        });
-        console.log(`Subtopic: ${subtopic.answer.substring(0, 30)}..., Score: ${score}`);
-        if (score > highestScore) {
-          highestScore = score;
-          bestMatch = subtopic.answer;
-        }
-      }
-    }
-
-    if (highestScore > 0) {
-      console.log('Dataset match found:', bestMatch);
-      return bestMatch;
-    }
-    console.log('No dataset match, falling back to API');
-    return null;
-  }
-
-  // Call Gemini API with context and history
+  // Call Gemini API with enhanced prompt
   let lastApiCall = 0;
   async function callGeminiAPI(userText) {
-    const apiKey = 'AIzaSyD1rrdR9nJs3TJCFYNlp1FfFWwhcJxoImo'; // Replace with your valid Gemini API key
+    const apiKey = 'YOUR_ACTUAL_GEMINI_API_KEY'; // Replace with your valid Gemini API key
     const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
-    const minDelay = 4000; // 4 seconds to avoid rate limits
+    const minDelay = 4000;
 
     // Enforce minimum delay
     const now = Date.now();
@@ -356,15 +438,15 @@
       await new Promise(resolve => setTimeout(resolve, minDelay - timeSinceLast));
     }
 
-    // Build context with dataset and history
-    const datasetContext = dataset.map(entry => 
+    // Build context
+    const datasetContext = dataset.map(entry =>
       entry.subtopics.map(sub => sub.answer).join('\n')
     ).join('\n\n');
     const historyContext = chatHistory
       .slice(-4)
       .map(msg => `${msg.sender === 'user' ? 'User' : 'Assistant'}: ${msg.text}`)
       .join('\n');
-    const prompt = `You are an AI assistant for Lalandi Conclusion, a Cape Town-based software development company. Use the following knowledge base to answer queries precisely in 2-3 sentences, focusing on Lalandi’s services (DevSecOps, SAP, software development, IT consulting), company details, or Oni Charles’ portfolio. If the query is unrelated, provide a concise general response.
+    const prompt = `You are an AI assistant for Lalandi Conclusion, a Cape Town-based software development company. Answer the query in 2-3 concise sentences (max 50 words) using the knowledge base below, prioritizing Lalandi’s services (DevSecOps, SAP, software development, IT consulting), company details, or Oni Charles’ portfolio. For unrelated queries, provide a brief general response.
 
 Knowledge Base:
 ${datasetContext}
@@ -415,18 +497,21 @@ User Query: ${userText}`;
     addMessage(input, 'user');
     userInput.value = '';
 
-    // Check dataset first
+    // Simulate typing for dataset
+    addMessage('Typing...', 'agent');
     const datasetReply = checkDataset(input);
     if (datasetReply) {
+      chat.lastChild.remove();
       addMessage(datasetReply, 'agent', datasetReply);
       speak(datasetReply);
       return;
     }
 
-    // Show loading message
+    // API fallback
+    chat.lastChild.remove();
     addMessage('Thinking...', 'agent');
     const aiReply = await callGeminiAPI(input);
-    chat.lastChild.remove(); // Remove "Thinking..." message
+    chat.lastChild.remove();
     addMessage(aiReply, 'agent', aiReply);
     speak(aiReply);
   }
@@ -442,12 +527,7 @@ User Query: ${userText}`;
 
   // Welcome message
   addMessage(
-    `Welcome to Oni Charles' AI Chat Agent! Ask about:
-- Lalandi Conclusion (e.g., "What is Lalandi?", "SAP services")
-- DevSecOps or SAP specifics (e.g., "Why DevSecOps?", "SAP stability")
-- Careers at Lalandi (e.g., "Jobs at Lalandi")
-- My portfolio (e.g., "Who is Oni Charles?", "Show projects")
-Use the 🎤 for voice input or "Stop Speech" to pause narration.`,
+    `Hi! I'm Oni Charles' AI Chat Agent. Ask about Lalandi Conclusion, DevSecOps, SAP, careers, or my portfolio. Use the 🎤 for voice input or "Stop Speech" to pause narration.`,
     'agent'
   );
 
