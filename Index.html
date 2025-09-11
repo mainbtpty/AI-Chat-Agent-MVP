@@ -42,6 +42,11 @@
       color: #d32f2f;
       background: #ffebee;
     }
+    .confidence {
+      font-size: 12px;
+      color: #666;
+      margin-top: 5px;
+    }
     #inputArea {
       margin-top: 15px;
       display: flex;
@@ -93,7 +98,7 @@
 
 <div id="inputArea">
   <input type="text" id="userInput" placeholder="Ask about Lalandi, DevSecOps, SAP, or my portfolio..." aria-label="Chat input" />
-  <button id="sendBtn">Send</button>
+  <button id="sendBtn" aria-label="Send message">Send</button>
   <button id="voiceBtn" aria-label="Start voice input">🎤</button>
   <button id="stopSpeechBtn" aria-label="Stop speech">Stop Speech</button>
 </div>
@@ -106,7 +111,7 @@
   const stopSpeechBtn = document.getElementById('stopSpeechBtn');
   let chatHistory = [];
   let currentUtterance = null;
-  let lastMatchedId = null; // Track last matched dataset ID for follow-ups
+  let lastMatchedId = null;
 
   // Dataset
   const dataset = [
@@ -114,7 +119,7 @@
       id: 'company-overview',
       subtopics: [
         {
-          keywords: ['lalandi', 'conclusion', 'who is lalandi', 'what is lalandi', 'lalandi conclusion', 'about lalandi'],
+          keywords: ['lalandi', 'conclusion', 'who is lalandi', 'what is lalandi', 'lalandi conclusion', 'about lalandi', 'what does lalandi do'],
           weight: 2,
           answer: `Lalandi Conclusion, established in 2006 in Cape Town, is a software development company within the Dutch Conclusion group, delivering bespoke solutions that blend artistry and technical expertise to clients in Africa and Europe.`
         },
@@ -127,6 +132,16 @@
           keywords: ['team', 'farzaana', 'marcel', 'taureen', 'lalandi team'],
           weight: 1,
           answer: `Lalandi’s team includes experts like Farzaana, Marcel, and Taureen, who contribute to crafting strategic software solutions with creativity and precision.`
+        },
+        {
+          keywords: ['marion', 'marion mugabirwa', 'mugabirwa'],
+          weight: 1,
+          answer: `Marion Mugabirwa is a key team member at Lalandi Conclusion, contributing to innovative IT projects and collaborative solutions.`
+        },
+        {
+          keywords: ['shannon', 'shannon smiling'],
+          weight: 1,
+          answer: `Shannon is a valued team member at Lalandi Conclusion, working on meaningful IT projects with a collaborative spirit.`
         }
       ]
     },
@@ -158,7 +173,6 @@
           weight: 1,
           answer: `We ensure SAP system stability by monitoring performance, minimizing downtime, and proactively resolving technical issues.`
         },
-        {
         {
           keywords: ['incident management', 'sap issues', 'sap errors'],
           weight: 1,
@@ -276,7 +290,7 @@
     return matrix[b.length][a.length];
   }
 
-  // Advanced keyword matching with fuzzy matching
+  // Advanced keyword matching with fuzzy matching and sentence filtering
   function checkDataset(input) {
     const lowerInput = input.toLowerCase().trim();
     const inputWords = lowerInput.split(/\s+/);
@@ -285,67 +299,75 @@
     let bestMatch = null;
     let highestScore = 0;
     let matchedId = null;
+    let confidence = 0;
 
     // Check for follow-up queries
     const isFollowUp = lowerInput.includes('more') || lowerInput.includes('tell me more') || lowerInput.includes('expand');
     if (isFollowUp && lastMatchedId) {
       const lastEntry = dataset.find(entry => entry.id === lastMatchedId);
       if (lastEntry) {
-        const longestAnswer = lastEntry.subtopics.reduce((prev, curr) => 
+        const longestAnswer = lastEntry.subtopics.reduce((prev, curr) =>
           prev.answer.length > curr.answer.length ? prev : curr
         );
         console.log('Follow-up detected, returning:', longestAnswer.answer);
-        return longestAnswer.answer;
+        return { answer: longestAnswer.answer, confidence: 0.9 };
       }
     }
 
     for (const entry of dataset) {
       for (const subtopic of entry.subtopics) {
         let score = 0;
+        let matchedKeywords = [];
         subtopic.keywords.forEach(keyword => {
           const keywordLower = keyword.toLowerCase();
           if (keywordLower.includes(' ')) {
-            if (lowerInput.includes(keywordLower)) score += subtopic.weight * 3; // Boost for exact phrase
+            if (lowerInput.includes(keywordLower)) {
+              score += subtopic.weight * 3;
+              matchedKeywords.push(keywordLower);
+            }
           } else {
             inputWords.forEach(word => {
               if (word.includes(keywordLower) || keywordLower.includes(word)) {
                 score += subtopic.weight;
-              } else if (levenshtein(word, keywordLower) <= 2) { // Fuzzy match
+                matchedKeywords.push(keywordLower);
+              } else if (levenshtein(word, keywordLower) <= 2) {
                 score += subtopic.weight * 0.5;
+                matchedKeywords.push(keywordLower);
               }
             });
           }
         });
-        console.log(`Subtopic: ${subtopic.answer.substring(0, 30)}..., Score: ${score}`);
+        console.log(`Subtopic: ${subtopic.answer.substring(0, 30)}..., Score: ${score}, Keywords: ${matchedKeywords}`);
         if (score > highestScore) {
           highestScore = score;
           bestMatch = subtopic.answer;
           matchedId = entry.id;
+          confidence = Math.min(score / 10, 1); // Normalize to 0-1
         }
       }
     }
 
-    if (highestScore > 1) { // Require minimum score to avoid weak matches
+    if (highestScore > 1) {
       console.log('Dataset match found:', bestMatch);
       lastMatchedId = matchedId;
-      return bestMatch;
+      return { answer: bestMatch, confidence };
     }
     console.log('No dataset match, falling back to API');
     lastMatchedId = null;
     return null;
   }
 
-  // Add message with keyword highlighting
-  function addMessage(text, sender, fullText = text) {
+  // Add message with keyword highlighting and confidence
+  function addMessage(text, sender, fullText = text, confidence = null) {
     const msgDiv = document.createElement('div');
     msgDiv.className = `message ${sender}`;
     const maxDisplayLength = 150;
     let displayText = text;
-    
+
     // Highlight matched keywords
     const inputWords = userInput.value.toLowerCase().trim().split(/\s+/);
     inputWords.forEach(word => {
-      if (word.length > 3) { // Only highlight longer words
+      if (word.length > 3) {
         const regex = new RegExp(`\\b${word}\\b`, 'gi');
         displayText = displayText.replace(regex, `<span class="highlight">${word}</span>`);
       }
@@ -361,6 +383,14 @@
     } else {
       msgDiv.innerHTML = displayText;
     }
+
+    if (confidence !== null) {
+      const confDiv = document.createElement('div');
+      confDiv.className = 'confidence';
+      confDiv.textContent = `Confidence: ${(confidence * 100).toFixed(0)}%`;
+      msgDiv.appendChild(confDiv);
+    }
+
     chat.appendChild(msgDiv);
     chat.scrollTop = chat.scrollHeight;
     chatHistory.push({ sender, text: fullText });
@@ -479,7 +509,6 @@ User Query: ${userText}`;
       const generatedText = data?.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, I did not understand that.';
       console.log('API response:', data);
       return generatedText;
-
     } catch (error) {
       console.error('Fetch error:', error);
       return 'Error connecting to AI service: ' + error.message;
@@ -499,11 +528,11 @@ User Query: ${userText}`;
 
     // Simulate typing for dataset
     addMessage('Typing...', 'agent');
-    const datasetReply = checkDataset(input);
-    if (datasetReply) {
+    const datasetResult = checkDataset(input);
+    if (datasetResult) {
       chat.lastChild.remove();
-      addMessage(datasetReply, 'agent', datasetReply);
-      speak(datasetReply);
+      addMessage(datasetResult.answer, 'agent', datasetResult.answer, datasetResult.confidence);
+      speak(datasetResult.answer);
       return;
     }
 
@@ -530,7 +559,6 @@ User Query: ${userText}`;
     `Hi! I'm Oni Charles' AI Chat Agent. Ask about Lalandi Conclusion, DevSecOps, SAP, careers, or my portfolio. Use the 🎤 for voice input or "Stop Speech" to pause narration.`,
     'agent'
   );
-
 </script>
 
 </body>
