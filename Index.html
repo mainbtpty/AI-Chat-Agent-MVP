@@ -122,7 +122,7 @@
       id: 'company-overview',
       subtopics: [
         {
-          keywords: ['lalandi', 'conclusion', 'who is lalandi', 'what is lalandi', 'lalandi conclusion', 'about lalandi', 'what does lalandi do'],
+          keywords: ['lalandi', 'conclusion', 'who is lalandi', 'what is lalandi', 'lalandi conclusion', 'about lalandi', 'what does lalandi do', 'tell me about the company', 'about the company'],
           weight: 2,
           answer: `Lalandi Conclusion, established in 2006 in Cape Town, is a software development company within the Dutch Conclusion group, delivering bespoke solutions that blend artistry and technical expertise to clients in Africa and Europe.`
         },
@@ -132,8 +132,8 @@
           answer: `Lalandi operates within the Conclusion group’s ecosystem, comprising over 30 expert companies, 4500+ professionals, 500+ clients, and a 79% fan score, enabling collaborative and innovative problem-solving.`
         },
         {
-          keywords: ['team', 'farzaana', 'marcel', 'taureen', 'lalandi team'],
-          weight: 1,
+          keywords: ['team', 'farzaana', 'marcel', 'taureen', 'lalandi team', 'who are the team'],
+          weight: 2,
           answer: `Lalandi’s team includes experts like Farzaana, Marcel, and Taureen, who contribute to crafting strategic software solutions with creativity and precision.`
         },
         {
@@ -197,9 +197,9 @@
       id: 'careers',
       subtopics: [
         {
-          keywords: ['careers', 'jobs', 'work at lalandi', 'vacancies', 'join lalandi', 'employment'],
+          keywords: ['careers', 'jobs', 'work at lalandi', 'vacancies', 'join lalandi', 'employment', 'careers at ladlandi', 'careers at lalandi', 'how do I join', 'what about careers'],
           weight: 2,
-          answer: `Join Lalandi Conclusion in Cape Town to work on meaningful IT projects with a collaborative team. Check our vacancies at https://www.conclusion.nl/en/lalandi#careers.`
+          answer: `Join Lalandi Conclusion in Cape Town to work on meaningful IT projects with a collaborative team. Check our vacancies at https://www.conclusion.nl/en/lalandi#careers or contact recruitment at https://www.conclusion.nl/en/lalandi/contact-recruitment.`
         }
       ]
     },
@@ -232,7 +232,7 @@
       id: 'oni-charles',
       subtopics: [
         {
-          keywords: ['oni charles', 'who is charles', 'oni', 'charles', 'kolapo', 'who built this app', 'developer'],
+          keywords: ['oni charles', 'who is charles', 'oni', 'charles', 'kolapo', 'who built this app', 'developer', 'tell me about oni', 'about oni'],
           weight: 2,
           answer: `Oni Charles is a self-taught Web3 developer skilled in JavaScript, Solidity, Python, React, Node.js, and AI tools like Gemini and OpenAI, with experience in building dApps and AI-driven solutions like this chatbot.`
         },
@@ -249,7 +249,7 @@
         {
           keywords: ['portfolio', 'projects', 'work', 'examples', 'oni projects'],
           weight: 2,
-          answer: `Oni Charles’ portfolio includes this AI chatbot (Gemini API, Web Speech API), a web scraper engine for data preprocessing, and Web3 dApps using React and Solidity. Ask for details or check my GitHub!`
+          answer: `Oni Charles’ portfolio includes this AI chatbot (Gemini API, Web Speech API), a web scraper for Lalandi data, and Web3 dApps using React and Solidity. Ask for details or check my GitHub!`
         }
       ]
     },
@@ -299,7 +299,7 @@
     return matrix[b.length][a.length];
   }
 
-  // Advanced keyword matching with fuzzy matching
+  // Advanced keyword matching with fuzzy matching and sentence filtering
   function checkDataset(input) {
     const lowerInput = input.toLowerCase().trim();
     const inputWords = lowerInput.split(/\s+/);
@@ -310,16 +310,16 @@
     let matchedId = null;
     let confidence = 0;
 
-    // Check for follow-up queries
-    const isFollowUp = lowerInput.includes('more') || lowerInput.includes('tell me more') || lowerInput.includes('expand');
+    // Check for follow-up queries or corrections
+    const isFollowUp = lowerInput.includes('more') || lowerInput.includes('tell me more') || lowerInput.includes('expand') || lowerInput.includes('i mean');
     if (isFollowUp && lastMatchedId) {
       const lastEntry = dataset.find(entry => entry.id === lastMatchedId);
       if (lastEntry) {
-        const longestAnswer = lastEntry.subtopics.reduce((prev, curr) =>
+        const relevantAnswer = lastEntry.subtopics.find(sub => sub.keywords.some(k => lowerInput.includes(k.toLowerCase()))) || lastEntry.subtopics.reduce((prev, curr) =>
           prev.answer.length > curr.answer.length ? prev : curr
         );
-        console.log('Follow-up detected, returning:', longestAnswer.answer);
-        return { answer: longestAnswer.answer, confidence: 0.9 };
+        console.log('Follow-up/correction detected, returning:', relevantAnswer.answer);
+        return { answer: relevantAnswer.answer, confidence: 0.8 };
       }
     }
 
@@ -409,9 +409,9 @@
 
   // Speak text using ElevenLabs TTS with Web Speech API fallback
   async function speak(text, cacheOnly = false) {
-    const apiKey = 'sk_7366bbdd8deefc2be8e95fa6187193dda0276d8fe4e2c6de'; // Replace with your ElevenLabs API key
-    const voiceId = 'pNInz6obpgDQGcFmaJgB'; // Adam voice (realistic US male)
-    const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream`; // Try streaming endpoint
+    const apiKey = 'sk_7366bbdd8deefc2be8e95fa6187193dda0276d8fe4e2c6de'; // Your ElevenLabs API key
+    const voiceId = 'pNInz6obpgDQGcFmaJgB'; // Adam voice
+    const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream`; // Streaming endpoint
 
     // Check cache
     if (audioCache.has(text)) {
