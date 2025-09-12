@@ -416,7 +416,7 @@
     // Check cache
     if (audioCache.has(text)) {
       console.log('Using cached audio for:', text.substring(0, 30));
-      const audioUrl = audioCache.get(text);.
+      const audioUrl = audioCache.get(text);
       if (!cacheOnly) {
         currentAudio = new Audio(audioUrl);
         currentAudio.play();
