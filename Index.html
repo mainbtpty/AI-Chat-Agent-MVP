@@ -1,5 +1,4 @@
-
-    <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -74,7 +73,8 @@
     #stopSpeechBtn { background: #d32f2f; }
     .loading::after {
       content: '⏳';
-      animation: spin 1s infinite;
+      display: inline-block;
+      animation: spin 1s linear infinite;
       margin-left: 5px;
     }
     .truncated::after {
@@ -95,7 +95,7 @@
 
 <h2>AI Chat Agent MVP by Oni Charles</h2>
 
-<div id="chat" role="log" aria-live="polite"></div>
+<div id="chat" role="log" aria-live="polite" aria-busy="false"></div>
 
 <div id="inputArea">
   <input type="text" id="userInput" placeholder="Ask about Lalandi, DevSecOps, SAP, or my portfolio..." aria-label="Chat input" />
@@ -114,6 +114,7 @@
   let currentUtterance = null;
   let currentAudio = null;
   let lastMatchedId = null;
+  const audioCache = new Map(); // Cache for audio blobs
 
   // Dataset
   const dataset = [
@@ -274,6 +275,12 @@
     }
   ];
 
+  // Preload audio for greeting
+  (async () => {
+    const greeting = dataset.find(entry => entry.id === 'greeting').subtopics[0].answer;
+    await speak(greeting, true); // Cache greeting audio
+  })();
+
   // Simple fuzzy matching (Levenshtein distance)
   function levenshtein(a, b) {
     const matrix = Array(b.length + 1).fill().map(() => Array(a.length + 1).fill(0));
@@ -292,7 +299,7 @@
     return matrix[b.length][a.length];
   }
 
-  // Advanced keyword matching with fuzzy matching and sentence filtering
+  // Advanced keyword matching with fuzzy matching
   function checkDataset(input) {
     const lowerInput = input.toLowerCase().trim();
     const inputWords = lowerInput.split(/\s+/);
@@ -344,7 +351,7 @@
           highestScore = score;
           bestMatch = subtopic.answer;
           matchedId = entry.id;
-          confidence = Math.min(score / 10, 1); // Normalize to 0-1
+          confidence = Math.min(score / 10, 1);
         }
       }
     }
@@ -397,13 +404,28 @@
     chat.scrollTop = chat.scrollHeight;
     chatHistory.push({ sender, text: fullText });
     if (chatHistory.length > 10) chatHistory.shift();
+    chat.setAttribute('aria-busy', 'false');
   }
 
   // Speak text using ElevenLabs TTS with Web Speech API fallback
-  async function speak(text) {
-    const apiKey = 'sk_7366bbdd8deefc2be8e95fa6187193dda0276d8fe4e2c6de'; // Replace with your ElevenLabs API key
+  async function speak(text, cacheOnly = false) {
+    const apiKey = 'YOUR_ELEVENLABS_API_KEY'; // Replace with your ElevenLabs API key
     const voiceId = 'pNInz6obpgDQGcFmaJgB'; // Adam voice (realistic US male)
-    const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
+    const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream`; // Try streaming endpoint
+
+    // Check cache
+    if (audioCache.has(text)) {
+      console.log('Using cached audio for:', text.substring(0, 30));
+      const audioUrl = audioCache.get(text);
+      if (!cacheOnly) {
+        currentAudio = new Audio(audioUrl);
+        currentAudio.play();
+        currentAudio.onended = () => {
+          currentAudio = null;
+        };
+      }
+      return;
+    }
 
     // Stop any ongoing speech
     if (currentAudio) {
@@ -415,49 +437,69 @@
       currentUtterance = null;
     }
 
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'xi-api-key': apiKey,
-          'Content-Type': 'application/json',
-          'accept': 'audio/mpeg'
-        },
-        body: JSON.stringify({
-          text: text,
-          model_id: 'eleven_monolingual_v1',
-          voice_settings: {
-            stability: 0.5,
-            similarity_boost: 0.75
+    // Try ElevenLabs API with retries
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'xi-api-key': apiKey,
+            'Content-Type': 'application/json',
+            'accept': 'audio/mpeg'
+          },
+          body: JSON.stringify({
+            text: text,
+            model_id: 'eleven_monolingual_v1',
+            voice_settings: {
+              stability: 0.5,
+              similarity_boost: 0.75
+            }
+          })
+        });
+
+        if (response.status === 429) {
+          console.warn(`Rate limit hit, retrying (${attempt}/3)...`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          continue;
+        }
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('ElevenLabs error:', response.status, response.statusText, errorText);
+          throw new Error(`ElevenLabs API error: ${response.status} ${response.statusText}`);
+        }
+
+        const audioBlob = await response.blob();
+        const audioUrl = URL.createObjectURL(audioBlob);
+        audioCache.set(text, audioUrl);
+        if (audioCache.size > 5) {
+          const firstKey = audioCache.keys().next().value;
+          URL.revokeObjectURL(audioCache.get(firstKey));
+          audioCache.delete(firstKey);
+        }
+
+        if (!cacheOnly) {
+          currentAudio = new Audio(audioUrl);
+          currentAudio.play();
+          currentAudio.onended = () => {
+            currentAudio = null;
+          };
+        }
+        return;
+      } catch (error) {
+        console.error('ElevenLabs fetch error:', error);
+        if (attempt === 3) {
+          addMessage('Failed to generate realistic voice: ' + (error.message.includes('401') ? 'Invalid API key' : error.message.includes('429') ? 'Quota exceeded' : 'Unknown error') + '. Using fallback voice.', 'error');
+          // Fallback to Web Speech API
+          if ('speechSynthesis' in window) {
+            currentUtterance = new SpeechSynthesisUtterance(text);
+            currentUtterance.lang = 'en-US';
+            currentUtterance.rate = 1.0;
+            window.speechSynthesis.speak(currentUtterance);
+          } else {
+            addMessage('Text-to-speech not supported in this browser.', 'error');
           }
-        })
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('ElevenLabs error:', response.status, response.statusText, errorText);
-        throw new Error(`ElevenLabs API error: ${response.status} ${response.statusText}`);
-      }
-
-      const audioBlob = await response.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
-      currentAudio = new Audio(audioUrl);
-      currentAudio.play();
-      currentAudio.onended = () => {
-        URL.revokeObjectURL(audioUrl);
-        currentAudio = null;
-      };
-    } catch (error) {
-      console.error('ElevenLabs fetch error:', error);
-      addMessage('Failed to generate realistic voice, using fallback.', 'error');
-      // Fallback to Web Speech API
-      if ('speechSynthesis' in window) {
-        currentUtterance = new SpeechSynthesisUtterance(text);
-        currentUtterance.lang = 'en-US';
-        currentUtterance.rate = 1.0;
-        window.speechSynthesis.speak(currentUtterance);
-      } else {
-        addMessage('Text-to-speech not supported in this browser.', 'error');
+        }
       }
     }
   }
@@ -513,7 +555,7 @@
   // Call Gemini API with enhanced prompt
   let lastApiCall = 0;
   async function callGeminiAPI(userText) {
-    const apiKey = 'AIzaSyD1rrdR9nJs3TJCFYNlp1FfFWwhcJxoImo'; // Replace with your valid Gemini API key
+    const apiKey = 'YOUR_ACTUAL_GEMINI_API_KEY'; // Replace with your valid Gemini API key
     const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
     const minDelay = 4000;
 
@@ -571,8 +613,21 @@ User Query: ${userText}`;
     }
   }
 
+  // Debounce function to prevent rapid submissions
+  function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  }
+
   // Send message handler
-  async function sendMessage() {
+  const sendMessage = debounce(async () => {
     const input = userInput.value.trim();
     if (!input) {
       addMessage('Please enter a message.', 'error');
@@ -581,9 +636,11 @@ User Query: ${userText}`;
 
     addMessage(input, 'user');
     userInput.value = '';
+    userInput.focus();
+    chat.setAttribute('aria-busy', 'true');
 
-    // Simulate typing for dataset
-    addMessage('Typing...', 'agent');
+    // Check dataset
+    addMessage('Typing...', 'agent loading');
     const datasetResult = checkDataset(input);
     if (datasetResult) {
       chat.lastChild.remove();
@@ -594,12 +651,12 @@ User Query: ${userText}`;
 
     // API fallback
     chat.lastChild.remove();
-    addMessage('Thinking...', 'agent');
+    addMessage('Thinking...', 'agent loading');
     const aiReply = await callGeminiAPI(input);
     chat.lastChild.remove();
     addMessage(aiReply, 'agent', aiReply);
     await speak(aiReply);
-  }
+  }, 300);
 
   // Event listeners
   sendBtn.addEventListener('click', sendMessage);
