@@ -409,14 +409,14 @@
 
   // Speak text using ElevenLabs TTS with Web Speech API fallback
   async function speak(text, cacheOnly = false) {
-    const apiKey = 'YOUR_ELEVENLABS_API_KEY'; // Replace with your ElevenLabs API key
+    const apiKey = 'sk_7366bbdd8deefc2be8e95fa6187193dda0276d8fe4e2c6de'; // Replace with your ElevenLabs API key
     const voiceId = 'pNInz6obpgDQGcFmaJgB'; // Adam voice (realistic US male)
     const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream`; // Try streaming endpoint
 
     // Check cache
     if (audioCache.has(text)) {
       console.log('Using cached audio for:', text.substring(0, 30));
-      const audioUrl = audioCache.get(text);
+      const audioUrl = audioCache.get(text);.
       if (!cacheOnly) {
         currentAudio = new Audio(audioUrl);
         currentAudio.play();
@@ -555,7 +555,7 @@
   // Call Gemini API with enhanced prompt
   let lastApiCall = 0;
   async function callGeminiAPI(userText) {
-    const apiKey = 'YOUR_ACTUAL_GEMINI_API_KEY'; // Replace with your valid Gemini API key
+    const apiKey = 'AIzaSyD1rrdR9nJs3TJCFYNlp1FfFWwhcJxoImo'; // Replace with your valid Gemini API key
     const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
     const minDelay = 4000;
 
