@@ -1,4 +1,5 @@
-<!DOCTYPE html>
+
+    <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -111,6 +112,7 @@
   const stopSpeechBtn = document.getElementById('stopSpeechBtn');
   let chatHistory = [];
   let currentUtterance = null;
+  let currentAudio = null;
   let lastMatchedId = null;
 
   // Dataset
@@ -397,21 +399,75 @@
     if (chatHistory.length > 10) chatHistory.shift();
   }
 
-  // Speak text aloud
-  function speak(text) {
+  // Speak text using ElevenLabs TTS with Web Speech API fallback
+  async function speak(text) {
+    const apiKey = 'sk_7366bbdd8deefc2be8e95fa6187193dda0276d8fe4e2c6de'; // Replace with your ElevenLabs API key
+    const voiceId = 'pNInz6obpgDQGcFmaJgB'; // Adam voice (realistic US male)
+    const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
+
+    // Stop any ongoing speech
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio = null;
+    }
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
-      currentUtterance = new SpeechSynthesisUtterance(text);
-      currentUtterance.lang = 'en-US';
-      currentUtterance.rate = 1.0;
-      window.speechSynthesis.speak(currentUtterance);
-    } else {
-      addMessage('Text-to-speech not supported in this browser.', 'error');
+      currentUtterance = null;
+    }
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'xi-api-key': apiKey,
+          'Content-Type': 'application/json',
+          'accept': 'audio/mpeg'
+        },
+        body: JSON.stringify({
+          text: text,
+          model_id: 'eleven_monolingual_v1',
+          voice_settings: {
+            stability: 0.5,
+            similarity_boost: 0.75
+          }
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('ElevenLabs error:', response.status, response.statusText, errorText);
+        throw new Error(`ElevenLabs API error: ${response.status} ${response.statusText}`);
+      }
+
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      currentAudio = new Audio(audioUrl);
+      currentAudio.play();
+      currentAudio.onended = () => {
+        URL.revokeObjectURL(audioUrl);
+        currentAudio = null;
+      };
+    } catch (error) {
+      console.error('ElevenLabs fetch error:', error);
+      addMessage('Failed to generate realistic voice, using fallback.', 'error');
+      // Fallback to Web Speech API
+      if ('speechSynthesis' in window) {
+        currentUtterance = new SpeechSynthesisUtterance(text);
+        currentUtterance.lang = 'en-US';
+        currentUtterance.rate = 1.0;
+        window.speechSynthesis.speak(currentUtterance);
+      } else {
+        addMessage('Text-to-speech not supported in this browser.', 'error');
+      }
     }
   }
 
-  // Stop speech
+  // Stop speech (handles both ElevenLabs and Web Speech API)
   stopSpeechBtn.addEventListener('click', () => {
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio = null;
+    }
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       currentUtterance = null;
@@ -532,7 +588,7 @@ User Query: ${userText}`;
     if (datasetResult) {
       chat.lastChild.remove();
       addMessage(datasetResult.answer, 'agent', datasetResult.answer, datasetResult.confidence);
-      speak(datasetResult.answer);
+      await speak(datasetResult.answer);
       return;
     }
 
@@ -542,7 +598,7 @@ User Query: ${userText}`;
     const aiReply = await callGeminiAPI(input);
     chat.lastChild.remove();
     addMessage(aiReply, 'agent', aiReply);
-    speak(aiReply);
+    await speak(aiReply);
   }
 
   // Event listeners
