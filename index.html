@@ -1,3 +1,5 @@
+Working. code for the AI Chatbot
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -70,7 +72,6 @@
       font-size: 14px;
     }
     #voiceBtn.listening { background: #d81b60; }
-    #voiceBtn.disabled { background: #ccc; cursor: not-allowed; }
     #stopSpeechBtn { background: #d32f2f; }
     .loading::after {
       content: '⏳';
@@ -235,7 +236,7 @@
         {
           keywords: ['oni charles', 'who is charles', 'oni', 'charles', 'kolapo', 'who built this app', 'developer', 'tell me about oni', 'about oni'],
           weight: 2,
-          answer: `Oni Charles is a Software Developer,Web3 developer. Skilled  in JavaScript, Solidity, Python, React, Node.js, and AI tools like Gemini and OpenAI, with experience in building dApps and AI-driven solutions like this chatbot.`
+          answer: `Oni Charles is a self-taught Web3 developer skilled in JavaScript, Solidity, Python, React, Node.js, and AI tools like Gemini and OpenAI, with experience in building dApps and AI-driven solutions like this chatbot.`
         },
         {
           keywords: ['blockchain', 'web3', 'smart contracts', 'decentralized apps'],
@@ -270,7 +271,7 @@
         {
           keywords: ['hello', 'how are you', 'what are you up to', 'hi', 'hello there'],
           weight: 2,
-          answer: `Hi! I'm Oni Charles' AI Chat Agent. Ask about Lalandi Conclusion, DevSecOps, SAP, careers, or my portfolio. Use the 🎤 for voice input (best in Chrome) or "Stop Speech" to pause narration.`
+          answer: `Hi! I'm Oni Charles' AI Chat Agent. Ask about Lalandi Conclusion, DevSecOps, SAP, careers, or my portfolio. Use the 🎤 for voice input or "Stop Speech" to pause narration.`
         }
       ]
     }
@@ -412,8 +413,9 @@
   async function speak(text, cacheOnly = false) {
     const apiKey = 'sk_7366bbdd8deefc2be8e95fa6187193dda0276d8fe4e2c6de'; // Your ElevenLabs API key
     const voiceId = 'pNInz6obpgDQGcFmaJgB'; // Adam voice
-    const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream`;
+    const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream`; // Streaming endpoint
 
+    // Check cache
     if (audioCache.has(text)) {
       console.log('Using cached audio for:', text.substring(0, 30));
       const audioUrl = audioCache.get(text);
@@ -427,6 +429,7 @@
       return;
     }
 
+    // Stop any ongoing speech
     if (currentAudio) {
       currentAudio.pause();
       currentAudio = null;
@@ -436,6 +439,7 @@
       currentUtterance = null;
     }
 
+    // Try ElevenLabs API with retries
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         const response = await fetch(url, {
@@ -488,6 +492,7 @@
         console.error('ElevenLabs fetch error:', error);
         if (attempt === 3) {
           addMessage('Failed to generate realistic voice: ' + (error.message.includes('401') ? 'Invalid API key' : error.message.includes('429') ? 'Quota exceeded' : 'Unknown error') + '. Using fallback voice.', 'error');
+          // Fallback to Web Speech API
           if ('speechSynthesis' in window) {
             currentUtterance = new SpeechSynthesisUtterance(text);
             currentUtterance.lang = 'en-US';
@@ -501,7 +506,7 @@
     }
   }
 
-  // Stop speech
+  // Stop speech (handles both ElevenLabs and Web Speech API)
   stopSpeechBtn.addEventListener('click', () => {
     if (currentAudio) {
       currentAudio.pause();
@@ -513,37 +518,10 @@
     }
   });
 
-  // Voice recognition setup with permission handling
+  // Voice recognition setup
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   let recognition;
-  async function checkMicPermission() {
-    try {
-      const permissionStatus = await navigator.permissions.query({ name: 'microphone' });
-      return permissionStatus.state; // 'granted', 'prompt', 'denied'
-    } catch (error) {
-      console.error('Permission query error:', error);
-      return 'unknown';
-    }
-  }
-
-  async function setupVoiceRecognition() {
-    if (!SpeechRecognition) {
-      voiceBtn.classList.add('disabled');
-      voiceBtn.textContent = '🎤 Voice Not Supported';
-      voiceBtn.disabled = true;
-      addMessage('Voice recognition is not supported in this browser. Please use text input or try Chrome.', 'error');
-      return;
-    }
-
-    const permission = await checkMicPermission();
-    if (permission === 'denied') {
-      voiceBtn.classList.add('disabled');
-      voiceBtn.textContent = '🎤 Mic Blocked';
-      voiceBtn.disabled = true;
-      addMessage('Microphone access is blocked. Please enable it in browser settings and refresh.', 'error');
-      return;
-    }
-
+  if (SpeechRecognition) {
     recognition = new SpeechRecognition();
     recognition.lang = 'en-US';
     recognition.continuous = false;
@@ -553,7 +531,6 @@
       const transcript = event.results[0][0].transcript;
       userInput.value = transcript;
       voiceBtn.classList.remove('listening');
-      voiceBtn.textContent = '🎤';
       sendMessage();
     };
 
@@ -570,57 +547,28 @@
     recognition.onerror = (event) => {
       voiceBtn.classList.remove('listening');
       voiceBtn.textContent = '🎤';
-      let errorMsg = 'Voice recognition error: ';
-      switch (event.error) {
-        case 'aborted':
-          errorMsg += 'Recognition aborted. Please try again or check microphone permissions.';
-          break;
-        case 'no-speech':
-          errorMsg += 'No speech detected. Please speak clearly and try again.';
-          break;
-        case 'audio-capture':
-          errorMsg += 'Microphone not found. Please connect a microphone and try again.';
-          break;
-        case 'not-allowed':
-          errorMsg += 'Microphone access denied. Please enable in browser settings.';
-          break;
-        default:
-          errorMsg += event.error + '. Please try again or use text input.';
-      }
-      addMessage(errorMsg, 'error');
+      addMessage('Voice recognition error: ' + event.error, 'error');
     };
-
-    voiceBtn.addEventListener('click', async () => {
-      if (voiceBtn.disabled) return;
-      const permission = await checkMicPermission();
-      if (permission === 'granted' || permission === 'prompt') {
-        try {
-          recognition.start();
-        } catch (error) {
-          console.error('Recognition start error:', error);
-          addMessage('Failed to start voice recognition: ' + error.message, 'error');
-        }
-      } else {
-        addMessage('Microphone access is required for voice input. Please enable in browser settings.', 'error');
-      }
-    });
+  } else {
+    voiceBtn.disabled = true;
+    voiceBtn.textContent = 'Voice Not Supported';
   }
 
-  // Initialize voice recognition
-  setupVoiceRecognition();
-
-  // Call Gemini API
+  // Call Gemini API with enhanced prompt
   let lastApiCall = 0;
   async function callGeminiAPI(userText) {
     const apiKey = 'AIzaSyD1rrdR9nJs3TJCFYNlp1FfFWwhcJxoImo'; // Replace with your valid Gemini API key
     const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
     const minDelay = 4000;
 
+    // Enforce minimum delay
     const now = Date.now();
-    if (now - lastApiCall < minDelay) {
-      await new Promise(resolve => setTimeout(resolve, minDelay - (now - lastApiCall)));
+    const timeSinceLast = now - lastApiCall;
+    if (timeSinceLast < minDelay) {
+      await new Promise(resolve => setTimeout(resolve, minDelay - timeSinceLast));
     }
 
+    // Build context
     const datasetContext = dataset.map(entry =>
       entry.subtopics.map(sub => sub.answer).join('\n')
     ).join('\n\n');
@@ -667,7 +615,7 @@ User Query: ${userText}`;
     }
   }
 
-  // Debounce function
+  // Debounce function to prevent rapid submissions
   function debounce(func, wait) {
     let timeout;
     return function executedFunction(...args) {
@@ -693,6 +641,7 @@ User Query: ${userText}`;
     userInput.focus();
     chat.setAttribute('aria-busy', 'true');
 
+    // Check dataset
     addMessage('Typing...', 'agent loading');
     const datasetResult = checkDataset(input);
     if (datasetResult) {
@@ -702,6 +651,7 @@ User Query: ${userText}`;
       return;
     }
 
+    // API fallback
     chat.lastChild.remove();
     addMessage('Thinking...', 'agent loading');
     const aiReply = await callGeminiAPI(input);
@@ -715,10 +665,13 @@ User Query: ${userText}`;
   userInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') sendMessage();
   });
+  voiceBtn.addEventListener('click', () => {
+    if (recognition) recognition.start();
+  });
 
   // Welcome message
   addMessage(
-    `Hi! I'm Oni Charles' AI Chat Agent. Ask about Lalandi Conclusion, DevSecOps, SAP, careers, or my portfolio. Use the 🎤 for voice input (best in Chrome) or "Stop Speech" to pause narration.`,
+    `Hi! I'm Oni Charles' AI Chat Agent. Ask about Lalandi Conclusion, DevSecOps, SAP, careers, or my portfolio. Use the 🎤 for voice input or "Stop Speech" to pause narration.`,
     'agent'
   );
 </script>
